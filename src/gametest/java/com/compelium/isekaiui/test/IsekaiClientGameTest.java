@@ -116,34 +116,34 @@ public class IsekaiClientGameTest implements FabricClientGameTest {
 			boolean isekai = ctx.computeOnClient(mc -> mc.screen instanceof IsekaiInventoryScreen);
 			if (!isekai) throw new AssertionError("O inventario isekai nao abriu");
 
-			// v0.2: arrastar a janela do inventario pela aba do titulo
-			double scale = ctx.computeOnClient(mc -> mc.getWindow().getGuiScale());
-			Rect before = ctx.computeOnClient(mc -> ((IsekaiInventoryScreen) mc.screen).debugPanelRect("main"));
-			ctx.getInput().setCursorPos((before.x() + 14) * scale, (before.y() - 5) * scale);
-			ctx.waitTicks(2);
-			ctx.getInput().holdMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
-			ctx.waitTicks(1);
-			for (int i = 0; i < 4; i++) {
-				ctx.getInput().moveCursor(18 * scale, 9 * scale);
-				ctx.waitTicks(1);
-			}
-			ctx.takeScreenshot("isekai-02c-arrastando-janela");
-			ctx.getInput().releaseMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
-			ctx.waitTicks(3);
+			// v0.2: arrastar a janela do inventario pela aba do titulo (escala 2: sobra espaco na tela)
+			setGuiScale(ctx, 2);
+			double scale = 2.0;
+			Rect before = panelRect(ctx, "main");
+			dragPanel(ctx, before, -60, -30, scale, "isekai-02c-arrastando-janela");
 			ctx.takeScreenshot("isekai-02d-janela-movida");
-			Rect moved = ctx.computeOnClient(mc -> ((IsekaiInventoryScreen) mc.screen).debugPanelRect("main"));
+			Rect moved = panelRect(ctx, "main");
 			System.out.println("[isekai-test] janela antes=" + before + " depois=" + moved);
 			if (moved.x() == before.x() && moved.y() == before.y()) throw new AssertionError("A janela nao foi arrastada");
-			// duplo clique na aba: volta para o lugar padrao
-			ctx.getInput().setCursorPos((moved.x() + 14) * scale, (moved.y() - 5) * scale);
-			ctx.waitTicks(2);
-			ctx.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
-			ctx.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
-			ctx.waitTicks(3);
-			Rect reset = ctx.computeOnClient(mc -> ((IsekaiInventoryScreen) mc.screen).debugPanelRect("main"));
-			if (reset.x() != before.x() || reset.y() != before.y()) {
+			doubleClickTab(ctx, moved, scale);
+			Rect reset = panelRect(ctx, "main");
+			if (!reset.equals(before)) {
 				throw new AssertionError("Duplo clique na aba nao devolveu a janela ao lugar padrao: " + reset + " (esperado " + before + ")");
 			}
+
+			// soltar uma janela em cima de outra: ela se encaixa no lugar livre mais perto
+			setGuiScale(ctx, 3);
+			scale = 3.0;
+			Rect before3 = panelRect(ctx, "main");
+			dragPanel(ctx, before3, 72, 36, scale, "isekai-02e-arrastando-por-cima");
+			ctx.takeScreenshot("isekai-02f-encaixada-no-lugar-livre");
+			Rect main3 = panelRect(ctx, "main");
+			Rect mini3 = panelRect(ctx, "minimap");
+			Rect craft3 = panelRect(ctx, "craft");
+			System.out.println("[isekai-test] encaixe: main=" + main3 + " minimapa=" + mini3 + " sintese=" + craft3);
+			if (intersects(main3, mini3) || intersects(main3, craft3)) throw new AssertionError("A janela ficou por cima de outra: " + main3);
+			doubleClickTab(ctx, main3, scale);
+			if (!panelRect(ctx, "main").equals(before3)) throw new AssertionError("Duplo clique nao restaurou a janela");
 
 			double[] mini = ctx.computeOnClient(IsekaiClientGameTest::miniCenter);
 			ctx.getInput().setCursorPos(mini[0], mini[1]);
@@ -332,6 +332,45 @@ public class IsekaiClientGameTest implements FabricClientGameTest {
 		Slot slot = screen.getMenu().slots.get(index);
 		double sc = mc.getWindow().getGuiScale();
 		return new double[]{(slot.x + 8) * sc, (slot.y + 8) * sc};
+	}
+
+	private static void setGuiScale(ClientGameTestContext ctx, int guiScale) {
+		ctx.runOnClient(mc -> {
+			mc.options.guiScale().set(guiScale);
+			mc.resizeDisplay();
+		});
+		ctx.waitTicks(5);
+	}
+
+	private static Rect panelRect(ClientGameTestContext ctx, String id) {
+		return ctx.computeOnClient(mc -> ((com.compelium.isekaiui.gui.IsekaiMenuScreen<?>) mc.screen).debugPanelRect(id));
+	}
+
+	/** Segura a aba do titulo, arrasta em 4 passos (foto no meio) e solta. */
+	private static void dragPanel(ClientGameTestContext ctx, Rect panel, int dx, int dy, double scale, String midShot) {
+		ctx.getInput().setCursorPos((panel.x() + 14) * scale, (panel.y() - 5) * scale);
+		ctx.waitTicks(2);
+		ctx.getInput().holdMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
+		ctx.waitTicks(1);
+		for (int i = 0; i < 4; i++) {
+			ctx.getInput().moveCursor(dx / 4.0 * scale, dy / 4.0 * scale);
+			ctx.waitTicks(1);
+		}
+		ctx.takeScreenshot(midShot);
+		ctx.getInput().releaseMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
+		ctx.waitTicks(3);
+	}
+
+	private static void doubleClickTab(ClientGameTestContext ctx, Rect panel, double scale) {
+		ctx.getInput().setCursorPos((panel.x() + 14) * scale, (panel.y() - 5) * scale);
+		ctx.waitTicks(2);
+		ctx.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
+		ctx.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
+		ctx.waitTicks(3);
+	}
+
+	private static boolean intersects(Rect a, Rect b) {
+		return a.x() < b.right() && b.x() < a.right() && a.y() < b.bottom() && b.y() < a.bottom();
 	}
 
 	private static void click(ClientGameTestContext ctx, Rect r, double scale) {

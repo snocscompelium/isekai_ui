@@ -395,7 +395,11 @@ public class IsekaiMapScreen extends Screen {
 		this.selEmblem = Emblems.get(land);
 		int count = 1 + emblemChoices().size();
 		int rows = (count + EMBLEM_COLS - 1) / EMBLEM_COLS;
-		int w = EMBLEM_COLS * CELL + 16;
+		int label = 0;
+		for (String k : new String[]{"isekai_ui.popup.open_folder", "isekai_ui.popup.reload", "isekai_ui.popup.done"}) {
+			label = Math.max(label, this.font.width(Component.translatable(k)));
+		}
+		int w = Math.max(EMBLEM_COLS * CELL + 16, 3 * (label + 12) + 8 + 16);
 		int hintLines = this.font.split(Component.translatable("isekai_ui.map.emblem_hint"), w - 18).size();
 		int h = 8 + rows * CELL + 6 + hintLines * 10 + 6 + 14 + 8;
 		this.popupRect = new Rect((this.width - w) / 2, Math.max(InventoryLayout.TAB + 4, (this.height - h) / 2), w, h);
@@ -455,6 +459,8 @@ public class IsekaiMapScreen extends Screen {
 		Rect pr = this.popupRect;
 		if (pr == null) return;
 		Draw.push(g);
+		// o vidro das janelas e translucido: um fundo quase opaco evita que o mapa apareca atraves do popup
+		Draw.fill(g, pr.x() + 2, pr.y() + 2, pr.right() - 2, pr.bottom() - 2, IsekaiMenuScreen.OVERLAY_BACKDROP);
 		if (this.popup == Popup.CONTEXT) {
 			Draw.sprite(g, Theme.PANEL, pr.x(), pr.y(), pr.w(), pr.h(), 1f);
 			for (int i = 0; i < this.contextOptions.size(); i++) {

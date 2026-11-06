@@ -120,6 +120,11 @@ public class IsekaiContainerScreen extends IsekaiMenuScreen<AbstractContainerMen
 	}
 
 	@Override
+	protected Panel slotOwner(int slotIndex) {
+		return slotIndex < this.rows * 9 ? this.storage : this.bag;
+	}
+
+	@Override
 	protected void drawPanel(GuiGraphics g, Panel p, float partialTick, int mouseX, int mouseY) {
 		if (p == this.storage) {
 			drawGrid(g, this.storageX + p.dx(), this.storageY + p.dy(), this.rows * 9, 9, p.alpha);

@@ -13,6 +13,7 @@ import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.Slot;
+import net.minecraft.world.item.ItemStack;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -30,6 +31,9 @@ public abstract class IsekaiMenuScreen<T extends AbstractContainerMenu> extends 
 	protected static final float GROUP_SECONDS = 0.34f;
 	protected static final float CLOSE_SECONDS = 0.18f;
 	private static final double DRAG_THRESHOLD = 3.0;
+	/** Fundo quase opaco atras de janelas que ficam por cima de outras (o vidro normal e translucido). */
+	public static final int OVERLAY_BACKDROP = 0xEE16131D;
+	private static final float TOP_LAYER = 320f;
 
 	/** Uma janela da tela. */
 	public static final class Panel {
@@ -48,6 +52,8 @@ public abstract class IsekaiMenuScreen<T extends AbstractContainerMenu> extends 
 		public boolean visible = true;
 		/** Desenhada por cima dos itens (janelas tipo popup). */
 		public boolean overlay;
+		/** Espaco extra embaixo que tambem pertence a janela (ex.: coordenadas sob o minimapa). */
+		public int padBottom;
 
 		public Panel(String id, float delay, int slideX, int slideY, boolean framed) {
 			this.id = id;
@@ -241,16 +247,66 @@ public abstract class IsekaiMenuScreen<T extends AbstractContainerMenu> extends 
 
 	private void loadLayout() {
 		Map<String, float[]> saved = IsekaiConfig.get().layouts.get(layoutKey());
+		List<Panel> moved = new ArrayList<>();
 		for (Panel p : this.panels) {
 			float[] f = saved == null ? null : saved.get(p.id);
 			if (f != null && f.length == 2) {
 				int x = Math.round(f[0] * Math.max(0, this.width - p.def.w()));
 				int y = Math.round(f[1] * Math.max(0, this.height - p.def.h()));
 				p.rect = clampToScreen(p, new Rect(x, y, p.def.w(), p.def.h()));
+				moved.add(p);
 			} else {
 				p.rect = clampToScreen(p, p.def);
 			}
 		}
+		// numa tela de outro tamanho as janelas salvas podem se encostar: empurra para o lugar livre mais proximo
+		for (Panel p : moved) p.rect = resolveOverlap(p, p.rect, p.rect);
+	}
+
+	// ------------------------------------------------------------------ janelas nao se sobrepoem
+
+	private static Rect area(Panel p, Rect r) {
+		int top = p.title != null ? InventoryLayout.TAB : 0;
+		return new Rect(r.x() - 2, r.y() - top - 2, r.w() + 4, r.h() + top + p.padBottom + 4);
+	}
+
+	private static boolean intersects(Rect a, Rect b) {
+		return a.x() < b.right() && b.x() < a.right() && a.y() < b.bottom() && b.y() < a.bottom();
+	}
+
+	private boolean overlapsOthers(Panel moving, Rect r) {
+		Rect a = area(moving, r);
+		for (Panel o : this.panels) {
+			if (o == moving || o.overlay || !o.visible) continue;
+			if (intersects(a, area(o, o.rect))) return true;
+		}
+		return false;
+	}
+
+	/** Se a janela ficou em cima de outra, procura o lugar livre mais perto (em aneis cada vez maiores). */
+	private Rect resolveOverlap(Panel p, Rect r, Rect fallback) {
+		if (p.overlay || !overlapsOthers(p, r)) return r;
+		int maxRadius = Math.max(this.width, this.height);
+		for (int radius = 4; radius <= maxRadius; radius += 4) {
+			Rect best = null;
+			long bestD = Long.MAX_VALUE;
+			for (int i = -radius; i <= radius; i += 4) {
+				Rect[] candidates = {r.offset(i, -radius), r.offset(i, radius), r.offset(-radius, i), r.offset(radius, i)};
+				for (Rect c0 : candidates) {
+					Rect c = clampToScreen(p, c0);
+					if (overlapsOthers(p, c)) continue;
+					long dx = c.x() - r.x();
+					long dy = c.y() - r.y();
+					long d = dx * dx + dy * dy;
+					if (d < bestD) {
+						bestD = d;
+						best = c;
+					}
+				}
+			}
+			if (best != null) return best;
+		}
+		return fallback;
 	}
 
 	private void saveLayout() {
@@ -368,16 +424,20 @@ public abstract class IsekaiMenuScreen<T extends AbstractContainerMenu> extends 
 		placeSlots();
 		super.render(g, mouseX, mouseY, partialTick);
 		float time = time();
+		// a janela sendo arrastada fica por cima de todas (com os itens dela)
+		Panel dragged = this.dragging ? this.pressPanel : null;
+		if (dragged != null && !dragged.overlay) {
+			Draw.push(g);
+			Draw.layer(g, TOP_LAYER);
+			drawPanelFull(g, dragged, partialTick, mouseX, mouseY, time, true);
+			renderPanelItems(g, dragged);
+			Draw.pop(g);
+		}
 		for (Panel p : this.panels) {
 			if (!p.overlay || !p.visible || p.alpha <= 0.01f) continue;
 			Draw.push(g);
-			Draw.layer(g, 320f);
-			if (p.framed) Panels.panel(g, this.font, p.now, p.alpha, p.progress, p.title, time);
-			drawPanel(g, p, partialTick, mouseX, mouseY);
-			if (p == this.pressPanel && this.dragging) {
-				Rect a = p.grabArea();
-				Draw.sprite(g, Theme.MAP_FRAME_GLOW, a.x() - 3, a.y() - 3, a.w() + 6, a.h() + 6, 0.8f);
-			}
+			Draw.layer(g, TOP_LAYER);
+			drawPanelFull(g, p, partialTick, mouseX, mouseY, time, true);
 			Draw.pop(g);
 		}
 		renderOverlay(g, mouseX, mouseY, partialTick);
@@ -403,13 +463,43 @@ public abstract class IsekaiMenuScreen<T extends AbstractContainerMenu> extends 
 		float time = time();
 		for (Panel p : this.panels) {
 			if (p.overlay || !p.visible || p.alpha <= 0.01f) continue;
-			if (p.framed) Panels.panel(g, this.font, p.now, p.alpha, p.progress, p.title, time);
-			drawPanel(g, p, partialTick, mouseX, mouseY);
-			if (p == this.pressPanel && this.dragging) {
-				Rect a = p.grabArea();
-				Draw.sprite(g, Theme.MAP_FRAME_GLOW, a.x() - 3, a.y() - 3, a.w() + 6, a.h() + 6, 0.8f);
-			}
+			if (p == this.pressPanel && this.dragging) continue; // desenhada por cima, em render()
+			drawPanelFull(g, p, partialTick, mouseX, mouseY, time, false);
 		}
+	}
+
+	/** Moldura + conteudo de uma janela. "onTop": janela por cima de outras, ganha fundo opaco. */
+	private void drawPanelFull(GuiGraphics g, Panel p, float partialTick, int mouseX, int mouseY, float time, boolean onTop) {
+		if (p.framed) {
+			if (onTop) {
+				Rect n = p.now;
+				Draw.fill(g, n.x() + 2, n.y() + 2, n.right() - 2, n.bottom() - 2, Draw.alpha(OVERLAY_BACKDROP, p.alpha));
+			}
+			Panels.panel(g, this.font, p.now, p.alpha, p.progress, p.title, time);
+		}
+		drawPanel(g, p, partialTick, mouseX, mouseY);
+		if (p == this.pressPanel && this.dragging) {
+			Rect a = p.grabArea();
+			Draw.sprite(g, Theme.MAP_FRAME_GLOW, a.x() - 3, a.y() - 3, a.w() + 6, a.h() + 6, 0.8f);
+		}
+	}
+
+	/** Itens dos slots da janela (usado quando ela e desenhada por cima das outras). */
+	private void renderPanelItems(GuiGraphics g, Panel p) {
+		for (int i = 0; i < this.menu.slots.size(); i++) {
+			Slot s = this.menu.slots.get(i);
+			ItemStack stack = s.getItem();
+			if (stack.isEmpty()) continue;
+			Panel owner = slotOwner(i);
+			if (owner != null ? owner != p : !p.now.contains(s.x + 8, s.y + 8)) continue;
+			g.renderItem(stack, s.x, s.y);
+			g.renderItemDecorations(this.font, stack, s.x, s.y);
+		}
+	}
+
+	/** Janela a que o slot pertence (null = descobrir pela posicao). */
+	protected Panel slotOwner(int slotIndex) {
+		return null;
 	}
 
 	// ------------------------------------------------------------------ entrada
@@ -482,7 +572,10 @@ public abstract class IsekaiMenuScreen<T extends AbstractContainerMenu> extends 
 			this.pressPanel = null;
 			if (this.dragging) {
 				this.dragging = false;
+				Rect before = new Rect(this.pressPanelX, this.pressPanelY, p.rect.w(), p.rect.h());
+				p.rect = resolveOverlap(p, p.rect, before);
 				saveLayout();
+				UiSounds.click();
 				return true;
 			}
 			boolean onTab = p.title != null && mouseY < p.now.y();

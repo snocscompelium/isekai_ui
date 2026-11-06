@@ -94,6 +94,7 @@ public class IsekaiInventoryScreen extends IsekaiMenuScreen<InventoryMenu> {
 		this.main = addPanel("main", 0f, 28, 0, true, Component.translatable("isekai_ui.panel.inventory"), L.main);
 		this.craft = addPanel("craft", 0.13f, 0, 18, true, Component.translatable("isekai_ui.panel.crafting"), L.craft);
 		this.mini = addPanel("minimap", 0.09f, 0, -18, false, regionName(), L.mini.grow(5));
+		this.mini.padBottom = 12;
 		this.bar = addPanel("bar", 0.17f, 0, 16, false, null, L.bar);
 		int rows = Math.max(1, Math.min(MAX_ROWS, CommandMemory.entries().size()));
 		int h = 8 + rows * ROW_H + 8;
@@ -149,6 +150,14 @@ public class IsekaiInventoryScreen extends IsekaiMenuScreen<InventoryMenu> {
 			if (b != null && b.command != null && !b.command.isBlank()) n++;
 		}
 		return n;
+	}
+
+	@Override
+	protected Panel slotOwner(int slotIndex) {
+		if (slotIndex >= 9 && slotIndex <= 44) return this.main;
+		if ((slotIndex >= 5 && slotIndex <= 8) || slotIndex == 45) return this.equip;
+		if (slotIndex >= 0 && slotIndex <= 4) return this.craft;
+		return null;
 	}
 
 	/** Onde o minimapa fica na tela (respeitando o layout salvo) — usado pelo mapa para voltar. */
