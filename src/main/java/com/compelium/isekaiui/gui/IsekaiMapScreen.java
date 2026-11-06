@@ -128,14 +128,14 @@ public class IsekaiMapScreen extends Screen {
 		this.buttons.add(new MapButton("grid", Component.translatable("isekai_ui.button.grid"), () -> toggle(() -> ms.showGrid = !ms.showGrid), () -> ms.showGrid));
 		if (this.popup == Popup.WAYPOINT) layoutWaypointEditor(this.nameBox == null ? "" : this.nameBox.getValue());
 		if (this.pendingShared != null) {
-			Waypoints.Waypoint w = this.pendingShared;
+			Waypoints.Waypoint shared = this.pendingShared;
 			this.pendingShared = null;
 			this.follow = false;
-			this.view.cx = w.x + 0.5;
-			this.view.cz = w.z + 0.5;
-			this.ctxX = w.x;
-			this.ctxZ = w.z;
-			openWaypointEditor(w, true);
+			this.view.cx = shared.x + 0.5;
+			this.view.cz = shared.z + 0.5;
+			this.ctxX = shared.x;
+			this.ctxZ = shared.z;
+			openWaypointEditor(shared, true);
 		}
 	}
 
