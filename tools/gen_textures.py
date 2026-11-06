@@ -871,6 +871,160 @@ ICONS = {
         ".##########.",
         "............",
     ],
+    "craft": [
+        "............",
+        ".####..####.",
+        ".#..#..#..#.",
+        ".#..#..#..#.",
+        ".####..####.",
+        "............",
+        "............",
+        ".####..####.",
+        ".#..#..#..#.",
+        ".#..#..#..#.",
+        ".####..####.",
+        "............",
+    ],
+    "chest": [
+        "............",
+        "............",
+        ".##########.",
+        ".#........#.",
+        ".#........#.",
+        ".####..####.",
+        ".#...##...#.",
+        ".#........#.",
+        ".#........#.",
+        ".##########.",
+        "............",
+        "............",
+    ],
+    "flame": [
+        ".....#......",
+        ".....##.....",
+        "....###.....",
+        "....####.#..",
+        "...######...",
+        "..#######...",
+        "..###.####..",
+        ".###...###..",
+        ".###...####.",
+        ".####.####..",
+        "..########..",
+        "...######...",
+    ],
+    "trash": [
+        "....####....",
+        ".##########.",
+        "............",
+        "..########..",
+        "..#.#..#.#..",
+        "..#.#..#.#..",
+        "..#.#..#.#..",
+        "..#.#..#.#..",
+        "..#.#..#.#..",
+        "..#.#..#.#..",
+        "..########..",
+        "............",
+    ],
+    "search": [
+        "...####.....",
+        "..#....#....",
+        ".#......#...",
+        ".#......#...",
+        ".#......#...",
+        ".#......#...",
+        "..#....#....",
+        "...#####....",
+        ".......###..",
+        "........###.",
+        ".........##.",
+        "............",
+    ],
+    "plus": [
+        "............",
+        ".....##.....",
+        ".....##.....",
+        ".....##.....",
+        ".....##.....",
+        ".##########.",
+        ".##########.",
+        ".....##.....",
+        ".....##.....",
+        ".....##.....",
+        ".....##.....",
+        "............",
+    ],
+    "catalog": [
+        "............",
+        "............",
+        ".##..##..##.",
+        ".##..##..##.",
+        "............",
+        ".##..##..##.",
+        ".##..##..##.",
+        "............",
+        ".##..##..##.",
+        ".##..##..##.",
+        "............",
+        "............",
+    ],
+    "chat": [
+        "............",
+        ".##########.",
+        ".#........#.",
+        ".#.######.#.",
+        ".#........#.",
+        ".#.####...#.",
+        ".#........#.",
+        ".####.#####.",
+        "....#.#.....",
+        "....##......",
+        "....#.......",
+        "............",
+    ],
+    "next": [
+        "............",
+        "....#.......",
+        "....##......",
+        "....###.....",
+        "....####....",
+        "....#####...",
+        "....####....",
+        "....###.....",
+        "....##......",
+        "....#.......",
+        "............",
+        "............",
+    ],
+    "prev": [
+        "............",
+        ".......#....",
+        "......##....",
+        ".....###....",
+        "....####....",
+        "...#####....",
+        "....####....",
+        ".....###....",
+        "......##....",
+        ".......#....",
+        "............",
+        "............",
+    ],
+    "potion_rack": [
+        "............",
+        "....####....",
+        ".....##.....",
+        ".....##.....",
+        "....####....",
+        "...#....#...",
+        "..#......#..",
+        "..#.####.#..",
+        "..#.####.#..",
+        "...######...",
+        "............",
+        "............",
+    ],
 }
 
 
@@ -1115,6 +1269,203 @@ def mod_icon():
     return img.resize((128, 128), Image.NEAREST)
 
 
+# ---------------------------------------------------------------- mochila (previa de shulker/sacola)
+# Couro claro: o jogo tinge com a cor da shulker/sacola (multiplicacao), por isso a base e quase branca.
+
+LEATHER_HI = (255, 251, 242)
+LEATHER = (238, 229, 214)
+LEATHER_SH = (206, 193, 174)
+LEATHER_OUT = (72, 60, 50)
+THREAD = (255, 252, 246)
+
+
+def leather_px(x, y):
+    """Granulado do couro, repetivel a cada 6 px (combina com o fatiamento em 9 partes)."""
+    n = ((x * 7 + y * 13) % 6 == 0) or ((x * 3 + y * 5) % 11 == 0)
+    return LEATHER_SH if n else LEATHER
+
+
+def backpack_body():
+    w = h = 32
+    img = new(w, h)
+    px = img.load()
+    for y in range(h):
+        for x in range(w):
+            cx = min(x, w - 1 - x)
+            cy = min(y, h - 1 - y)
+            if cx + cy < 2:  # cantos arredondados
+                continue
+            if cx == 0 or cy == 0 or (cx + cy == 2):
+                px[x, y] = rgba(LEATHER_OUT)
+                continue
+            c = leather_px(x, y)
+            if cy == 1 and y < h // 2:
+                c = LEATHER_HI
+            if cy == 1 and y > h // 2:
+                c = LEATHER_SH
+            # costura tracejada a 3 px da borda (periodo 3 = divide a parte repetida de 18 px)
+            ring3 = min(cx, cy) == 3
+            if ring3 and ((x + y) % 3 != 0):
+                c = THREAD
+            px[x, y] = rgba(c)
+    return img
+
+
+def backpack_flap():
+    """Tampa da mochila: topo bem arredondado (raio 6), costura e sombra na borda de baixo."""
+    w, h = 48, 18
+    img = new(w, h)
+    px = img.load()
+    rad = 6.0
+    for y in range(h):
+        for x in range(w):
+            cx = min(x, w - 1 - x)
+            out_line = False
+            if y < rad and cx < rad:
+                dx, dy = rad - 0.5 - cx, rad - 0.5 - y
+                d = math.sqrt(dx * dx + dy * dy)
+                if d > rad - 0.1:
+                    continue
+                out_line = d > rad - 1.1
+            if out_line or cx == 0 or y == 0 or y == h - 1:
+                px[x, y] = rgba(LEATHER_OUT)
+                continue
+            c = tuple(int(v * 0.94) for v in leather_px(x, y))
+            if y == 1 or (y < rad and cx < rad and y <= 2):
+                c = LEATHER_HI
+            if y == h - 2:
+                c = tuple(int(v * 0.78) for v in LEATHER_SH)
+            stitch = (y == h - 4 and 3 <= cx) or (cx == 3 and 4 <= y <= h - 4)
+            if stitch and ((x + y) % 3 != 0):
+                c = THREAD
+            px[x, y] = rgba(c)
+    return img
+
+
+def backpack_strap():
+    """Correia vertical (repetivel) com furos."""
+    w, h = 6, 12
+    img = new(w, h)
+    px = img.load()
+    for y in range(h):
+        for x in range(w):
+            if x == 0 or x == w - 1:
+                px[x, y] = rgba(LEATHER_OUT)
+            else:
+                c = tuple(int(v * 0.82) for v in LEATHER)
+                if x == 1:
+                    c = tuple(int(v * 0.9) for v in LEATHER_HI)
+                if y % 6 == 3 and 2 <= x <= 3:
+                    c = LEATHER_OUT
+                px[x, y] = rgba(c)
+    return img
+
+
+def backpack_side():
+    """Bolso lateral (aparece meio escondido atras do corpo)."""
+    w, h = 8, 22
+    img = new(w, h)
+    px = img.load()
+    for y in range(h):
+        for x in range(w):
+            cx = min(x, w - 1 - x)
+            cy = min(y, h - 1 - y)
+            if cx + cy < 2:
+                continue
+            if cx == 0 or cy == 0 or cx + cy == 2:
+                px[x, y] = rgba(LEATHER_OUT)
+                continue
+            c = tuple(int(v * 0.86) for v in leather_px(x, y))
+            if y == 4:
+                c = tuple(int(v * 0.7) for v in LEATHER_SH)
+            px[x, y] = rgba(c)
+    return img
+
+
+def backpack_handle():
+    w, h = 16, 6
+    img = new(w, h)
+    px = img.load()
+    for y in range(h):
+        for x in range(w):
+            dx = (x + 0.5 - w / 2.0) / (w / 2.0)
+            dy = (y + 0.5 - h) / h
+            d = math.sqrt(dx * dx + dy * dy)
+            if 0.62 <= d <= 1.0:
+                px[x, y] = rgba(LEATHER_OUT if (d > 0.9 or d < 0.7) else LEATHER)
+    return img
+
+
+def backpack_buckle():
+    rows = [
+        "..######..",
+        ".#oooooo#.",
+        "#o#####o#.",
+        "#o#..#.#o#",
+        "#o#..#.#o#",
+        "#o#####o#.",
+        ".#oooooo#.",
+        "..######..",
+    ]
+    img = new(10, 8)
+    px = img.load()
+    for y, row in enumerate(rows):
+        for x, ch in enumerate(row):
+            if ch == "#":
+                px[x, y] = rgba(INK)
+            elif ch == "o":
+                px[x, y] = rgba(GOLD_HI if y < 4 else GOLD)
+    return img
+
+
+def backpack_pocket():
+    w = h = 18
+    img = new(w, h)
+    px = img.load()
+    for y in range(h):
+        for x in range(w):
+            r = ring(x, y, w, h)
+            corner = (min(x, w - 1 - x) + min(y, h - 1 - y)) < 1
+            if corner:
+                continue
+            if r == 0:
+                px[x, y] = rgba((40, 28, 20), 120)
+            elif x == 1 or y == 1:
+                px[x, y] = rgba((20, 13, 9), 150)
+            elif x == w - 2 or y == h - 2:
+                px[x, y] = rgba((255, 240, 220), 60)
+            else:
+                px[x, y] = rgba((30, 20, 14), 105)
+    return img
+
+
+def progress_arrow(full):
+    """Seta grande de progresso (22x15): vazia (escura) ou cheia (marfim + dourado)."""
+    w, h = 22, 15
+    img = new(w, h)
+    px = img.load()
+
+    def inside(x, y):
+        if x < 0 or y < 0 or x >= w or y >= h:
+            return False
+        if x <= 13 and 5 <= y <= 9:
+            return True
+        if x >= 12:
+            return abs(y - 7) <= (21 - x) * 7.0 / 9.0 + 0.35
+        return False
+
+    for y in range(h):
+        for x in range(w):
+            if not inside(x, y):
+                continue
+            edge = not (inside(x - 1, y) and inside(x + 1, y) and inside(x, y - 1) and inside(x, y + 1))
+            if full:
+                px[x, y] = rgba(IVORY_HI if edge else (GOLD_HI if y < 7 else GOLD))
+            else:
+                px[x, y] = rgba((96, 88, 108) if edge else (34, 30, 42), 235)
+    return img
+
+
 def main():
     root = sys.argv[1]
     preview = sys.argv[2] if len(sys.argv) > 2 else None
@@ -1135,10 +1486,19 @@ def main():
     out["hex_button_hover"] = (hex_button_hover(), sprites + "hex_button_hover.png", None)
     out["hex_button_on"] = (hex_button_on(), sprites + "hex_button_on.png", None)
     out["craft_arrow"] = (craft_arrow(), sprites + "craft_arrow.png", None)
+    out["progress_arrow"] = (progress_arrow(False), sprites + "progress_arrow.png", None)
+    out["progress_arrow_full"] = (progress_arrow(True), sprites + "progress_arrow_full.png", None)
     for name, rows in ICONS.items():
         out["icon/" + name] = (icon(rows), sprites + "icon/" + name + ".png", None)
     for name, (field, charge, rows) in EMBLEMS.items():
         out["emblem/" + name] = (emblem(field, charge, rows), plain + "emblem/" + name + ".png", None)
+    out["backpack_body"] = (backpack_body(), sprites + "backpack_body.png", 7)
+    out["backpack_flap"] = (backpack_flap(), sprites + "backpack_flap.png", {"left": 8, "top": 7, "right": 8, "bottom": 6})
+    out["backpack_strap"] = (backpack_strap(), sprites + "backpack_strap.png", None)
+    out["backpack_side"] = (backpack_side(), sprites + "backpack_side.png", {"left": 3, "top": 6, "right": 3, "bottom": 6})
+    out["backpack_handle"] = (backpack_handle(), sprites + "backpack_handle.png", None)
+    out["backpack_buckle"] = (backpack_buckle(), sprites + "backpack_buckle.png", None)
+    out["backpack_pocket"] = (backpack_pocket(), sprites + "backpack_pocket.png", None)
     out["glint"] = (glint(), plain + "glint.png", None)
     out["map_arrow"] = (map_arrow(), plain + "map_arrow.png", None)
     out["map_dot"] = (map_dot(), plain + "map_dot.png", None)

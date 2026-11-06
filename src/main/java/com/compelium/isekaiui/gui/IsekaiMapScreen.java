@@ -5,6 +5,7 @@ import com.compelium.isekaiui.client.IsekaiKeys;
 import com.compelium.isekaiui.client.UiSounds;
 import com.compelium.isekaiui.config.IsekaiConfig;
 import com.compelium.isekaiui.lands.LandsTracker;
+import com.compelium.isekaiui.map.ChatWaypoints;
 import com.compelium.isekaiui.map.DimMap;
 import com.compelium.isekaiui.map.Emblems;
 import com.compelium.isekaiui.map.MapIcons;
@@ -15,6 +16,7 @@ import com.compelium.isekaiui.map.Waypoints;
 import net.minecraft.Util;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.client.player.LocalPlayer;
@@ -65,6 +67,8 @@ public class IsekaiMapScreen extends Screen {
 	private Waypoints.Waypoint ctxWaypoint;
 	private final List<ContextOption> contextOptions = new ArrayList<>();
 	private Waypoints.Waypoint editing;
+	/** Marcador vindo do chat (botao [+ Marcador]) que abre o editor assim que o mapa abrir. */
+	private Waypoints.Waypoint pendingShared;
 	private boolean editingNew;
 	private EditBox nameBox;
 	private String selIcon = "glyph:pin";
@@ -86,6 +90,13 @@ public class IsekaiMapScreen extends Screen {
 
 	public static IsekaiMapScreen fromHotkey() {
 		return new IsekaiMapScreen(null, false);
+	}
+
+	/** Abre o mapa ja com o editor de um marcador novo (recebido no chat), centralizado nele. */
+	public static IsekaiMapScreen editShared(Waypoints.Waypoint w) {
+		IsekaiMapScreen screen = new IsekaiMapScreen(null, false);
+		screen.pendingShared = w;
+		return screen;
 	}
 
 	public static IsekaiMapScreen fromInventory(Rect miniRect) {
@@ -116,6 +127,16 @@ public class IsekaiMapScreen extends Screen {
 		this.buttons.add(new MapButton("pin", Component.translatable("isekai_ui.button.waypoints"), () -> toggle(() -> ms.showWaypoints = !ms.showWaypoints), () -> ms.showWaypoints));
 		this.buttons.add(new MapButton("grid", Component.translatable("isekai_ui.button.grid"), () -> toggle(() -> ms.showGrid = !ms.showGrid), () -> ms.showGrid));
 		if (this.popup == Popup.WAYPOINT) layoutWaypointEditor(this.nameBox == null ? "" : this.nameBox.getValue());
+		if (this.pendingShared != null) {
+			Waypoints.Waypoint w = this.pendingShared;
+			this.pendingShared = null;
+			this.follow = false;
+			this.view.cx = w.x + 0.5;
+			this.view.cz = w.z + 0.5;
+			this.ctxX = w.x;
+			this.ctxZ = w.z;
+			openWaypointEditor(w, true);
+		}
 	}
 
 	private static void toggle(Runnable change) {
@@ -441,6 +462,29 @@ public class IsekaiMapScreen extends Screen {
 		closePopup();
 	}
 
+	/** Botao "compartilhar no chat" na linha das coordenadas do editor de marcador. */
+	private static Rect shareRect(Rect pr, int colorsY) {
+		return new Rect(pr.right() - 8 - 22, colorsY + 14 + 3, 22, 14);
+	}
+
+	/** Fecha o mapa e abre o chat com o marcador escrito num formato que outros mods de mapa entendem. */
+	private void shareWaypoint() {
+		if (this.editing == null) return;
+		Waypoints.Waypoint copy = new Waypoints.Waypoint();
+		String name = this.nameBox == null ? this.editing.name : this.nameBox.getValue().strip();
+		copy.name = name == null || name.isEmpty() ? Component.translatable("isekai_ui.map.waypoint_default").getString() : name;
+		copy.x = this.editing.x;
+		copy.y = this.editing.y;
+		copy.z = this.editing.z;
+		copy.color = this.selColor;
+		copy.icon = this.selIcon;
+		String dim = MapManager.currentDimension();
+		String text = ChatWaypoints.shareText(copy, dim == null ? "minecraft:overworld" : dim);
+		UiSounds.click();
+		closePopup();
+		this.minecraft.setScreen(new ChatScreen(text));
+	}
+
 	/** Botoes de texto dos popups (pilula escura com texto). */
 	private List<Rect> popupButtons(int count) {
 		List<Rect> list = new ArrayList<>();
@@ -498,6 +542,11 @@ public class IsekaiMapScreen extends Screen {
 				Draw.fill(g, sw.x(), sw.y(), sw.right(), sw.bottom(), sel ? 0xFFFFF2CF : 0xFF1B160F);
 				Draw.fill(g, sw.x() + 2, sw.y() + 2, sw.right() - 2, sw.bottom() - 2, 0xFF000000 | c);
 			}
+			Rect share = shareRect(pr, cy);
+			boolean shareHover = share.contains(mx, my);
+			Draw.sprite(g, shareHover ? Theme.TAB : Theme.PILL, share.x(), share.y(), share.w(), share.h(), 1f);
+			Draw.sprite(g, Theme.icon("chat"), share.cx() - 5, share.cy() - 5, 10, 10, shareHover ? 0xFF3A2B17 : 0xFFE6CB82);
+			if (shareHover) this.setTooltipForNextRenderPass(Component.translatable("isekai_ui.map.share"));
 			Component coords = Component.literal("X " + this.editing.x + "   Y " + this.editing.y + "   Z " + this.editing.z);
 			Draw.text(g, this.font, coords, pr.x() + 10, cy + 14 + 6, Theme.TEXT_DIM, false);
 			List<Rect> btns = popupButtons(this.editingNew ? 2 : 3);
@@ -585,6 +634,10 @@ public class IsekaiMapScreen extends Screen {
 					UiSounds.hover();
 					return true;
 				}
+			}
+			if (shareRect(pr, cy).contains(mx, my)) {
+				shareWaypoint();
+				return true;
 			}
 			List<Rect> btns = popupButtons(this.editingNew ? 2 : 3);
 			if (btns.get(0).contains(mx, my)) saveWaypoint();

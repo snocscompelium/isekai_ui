@@ -37,6 +37,15 @@ public final class Theme {
 	public static final ResourceLocation HEX_BUTTON_HOVER = IsekaiUI.id("hex_button_hover");
 	public static final ResourceLocation HEX_BUTTON_ON = IsekaiUI.id("hex_button_on");
 	public static final ResourceLocation CRAFT_ARROW = IsekaiUI.id("craft_arrow");
+	public static final ResourceLocation PROGRESS_ARROW = IsekaiUI.id("progress_arrow");
+	public static final ResourceLocation PROGRESS_ARROW_FULL = IsekaiUI.id("progress_arrow_full");
+	public static final ResourceLocation BACKPACK_BODY = IsekaiUI.id("backpack_body");
+	public static final ResourceLocation BACKPACK_FLAP = IsekaiUI.id("backpack_flap");
+	public static final ResourceLocation BACKPACK_HANDLE = IsekaiUI.id("backpack_handle");
+	public static final ResourceLocation BACKPACK_BUCKLE = IsekaiUI.id("backpack_buckle");
+	public static final ResourceLocation BACKPACK_POCKET = IsekaiUI.id("backpack_pocket");
+	public static final ResourceLocation BACKPACK_STRAP = IsekaiUI.id("backpack_strap");
+	public static final ResourceLocation BACKPACK_SIDE = IsekaiUI.id("backpack_side");
 	public static final ResourceLocation PILL = IsekaiUI.id("pill");
 
 	// Texturas soltas (assets/isekai_ui/textures/gui/plain/*.png)
@@ -47,7 +56,8 @@ public final class Theme {
 	public static final Set<String> ICONS = Set.of(
 			"map", "camera_third", "camera_first", "inventory", "center", "entities", "claims", "grid", "close", "back",
 			"star", "sword", "paw", "scroll", "coin", "house", "book", "gear", "people", "flag", "compass", "potion",
-			"list", "pin", "gem", "skull", "tree", "pickaxe", "anchor", "portal", "tower");
+			"list", "pin", "gem", "skull", "tree", "pickaxe", "anchor", "portal", "tower",
+			"craft", "chest", "flame", "trash", "search", "plus", "catalog", "chat", "next", "prev", "potion_rack");
 
 	public static ResourceLocation icon(String name) {
 		return IsekaiUI.id("icon/" + (ICONS.contains(name) ? name : "star"));

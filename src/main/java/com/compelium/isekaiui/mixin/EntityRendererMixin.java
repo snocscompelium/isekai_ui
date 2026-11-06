@@ -7,6 +7,8 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.client.renderer.entity.state.ArmedEntityRenderState;
 import net.minecraft.client.renderer.entity.state.EntityRenderState;
+import net.minecraft.client.renderer.entity.state.HumanoidRenderState;
+import com.compelium.isekaiui.client.SmithingPreview;
 import net.minecraft.world.entity.Entity;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -22,7 +24,9 @@ public abstract class EntityRendererMixin {
 		EntityRenderState state = cir.getReturnValue();
 		if (state == null) return;
 		float weight = PoseState.weight();
-		boolean browsing = weight > 0.001f && entity == Minecraft.getInstance().player;
+		boolean local = entity == Minecraft.getInstance().player;
+		if (local && state instanceof HumanoidRenderState humanoid) SmithingPreview.apply(humanoid);
+		boolean browsing = weight > 0.001f && local;
 		((PoseFlag) state).isekai$setLocalBrowsing(browsing);
 		if (browsing && weight > 0.25f && IsekaiConfig.get().hideHeldItemsWhileBrowsing && state instanceof ArmedEntityRenderState armed) {
 			armed.rightHandItem.clear();

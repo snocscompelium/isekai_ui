@@ -1,7 +1,7 @@
 package com.compelium.isekaiui.test;
 
 import com.compelium.isekaiui.commands.CommandMemory;
-import com.compelium.isekaiui.gui.IsekaiContainerScreen;
+import com.compelium.isekaiui.gui.IsekaiChestScreen;
 import com.compelium.isekaiui.gui.IsekaiInventoryScreen;
 import com.compelium.isekaiui.gui.IsekaiMapScreen;
 import com.compelium.isekaiui.gui.Rect;
@@ -244,7 +244,7 @@ public class IsekaiClientGameTest implements FabricClientGameTest {
 			ctx.runOnClient(mc -> useBlock(mc, 2));
 			ctx.waitTicks(40);
 			ctx.takeScreenshot("isekai-13-bau-isekai");
-			boolean chestIsekai = ctx.computeOnClient(mc -> mc.screen instanceof IsekaiContainerScreen);
+			boolean chestIsekai = ctx.computeOnClient(mc -> mc.screen instanceof IsekaiChestScreen);
 			if (!chestIsekai) throw new AssertionError("O bau nao abriu no estilo isekai: " + ctx.computeOnClient(mc -> String.valueOf(mc.screen)));
 			double[] shulkerSlot = ctx.computeOnClient(mc -> slotCenter(mc, 4));
 			ctx.getInput().setCursorPos(shulkerSlot[0], shulkerSlot[1]);

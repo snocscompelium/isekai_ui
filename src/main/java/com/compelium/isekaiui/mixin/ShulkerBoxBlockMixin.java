@@ -1,7 +1,7 @@
 package com.compelium.isekaiui.mixin;
 
 import com.compelium.isekaiui.config.IsekaiConfig;
-import com.compelium.isekaiui.tooltip.ShulkerPreview;
+import com.compelium.isekaiui.tooltip.BackpackPreview;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -19,6 +19,6 @@ import java.util.List;
 public abstract class ShulkerBoxBlockMixin {
 	@Inject(method = "appendHoverText", at = @At("HEAD"), cancellable = true)
 	private void isekai$hideTextList(ItemStack stack, Item.TooltipContext context, List<Component> lines, TooltipFlag flag, CallbackInfo ci) {
-		if (IsekaiConfig.get().shulkerPreview && ShulkerPreview.of(stack) != null) ci.cancel();
+		if (IsekaiConfig.get().shulkerPreview && BackpackPreview.shulker(stack) != null) ci.cancel();
 	}
 }

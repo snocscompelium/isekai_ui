@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.BooleanSupplier;
 
 /**
  * Base das telas isekai com slots (inventario, baus...). Cuida das janelas (paineis), das animacoes,
@@ -34,6 +35,13 @@ public abstract class IsekaiMenuScreen<T extends AbstractContainerMenu> extends 
 	/** Fundo quase opaco atras de janelas que ficam por cima de outras (o vidro normal e translucido). */
 	public static final int OVERLAY_BACKDROP = 0xEE16131D;
 	private static final float TOP_LAYER = 320f;
+
+	/** Botao hexagonal preso no lado direito de uma janela (anda junto quando ela e arrastada). */
+	public record SideButton(Panel panel, String icon, Component tooltip, Runnable action, BooleanSupplier on) {
+	}
+
+	protected final List<SideButton> sideButtons = new ArrayList<>();
+	private SideButton hoveredSide;
 
 	/** Uma janela da tela. */
 	public static final class Panel {
@@ -156,6 +164,7 @@ public abstract class IsekaiMenuScreen<T extends AbstractContainerMenu> extends 
 			onOpened();
 		}
 		this.panels.clear();
+		this.sideButtons.clear();
 		createPanels();
 		loadLayout();
 		updatePanels();
@@ -222,7 +231,41 @@ public abstract class IsekaiMenuScreen<T extends AbstractContainerMenu> extends 
 		return (System.nanoTime() - nanos) / 1.0e9f;
 	}
 
-	// ------------------------------------------------------------------ layout salvo
+	// ------------------------------------------------------------------ botoes laterais
+
+	protected SideButton addSideButton(Panel panel, String icon, Component tooltip, Runnable action, BooleanSupplier on) {
+		SideButton b = new SideButton(panel, icon, tooltip, action, on);
+		this.sideButtons.add(b);
+		return b;
+	}
+
+	protected Rect sideButtonRect(SideButton b) {
+		int i = 0;
+		for (SideButton o : this.sideButtons) {
+			if (o == b) break;
+			if (o.panel() == b.panel()) i++;
+		}
+		Rect r = b.panel().now;
+		return new Rect(r.right() + 2, r.y() + 1 + i * (InventoryLayout.HEX_H + 3), InventoryLayout.HEX_W, InventoryLayout.HEX_H);
+	}
+
+	protected SideButton sideButtonAt(double mx, double my) {
+		for (SideButton b : this.sideButtons) {
+			Panel p = b.panel();
+			if (!p.visible || p.alpha < 0.5f) continue;
+			if (sideButtonRect(b).contains(mx, my)) return b;
+		}
+		return null;
+	}
+
+	private void drawSideButtons(GuiGraphics g, Panel p) {
+		for (SideButton b : this.sideButtons) {
+			if (b.panel() != p) continue;
+			Panels.hexButton(g, sideButtonRect(b), b.icon(), b == this.hoveredSide, b.on().getAsBoolean(), p.alpha);
+		}
+	}
+
+		// ------------------------------------------------------------------ layout salvo
 
 	protected Panel addPanel(String id, float delay, int slideX, int slideY, boolean framed, Component title, Rect def) {
 		Panel p = new Panel(id, delay, slideX, slideY, framed);
@@ -422,6 +465,9 @@ public abstract class IsekaiMenuScreen<T extends AbstractContainerMenu> extends 
 		}
 		updatePanels();
 		placeSlots();
+		SideButton hoverBefore = this.hoveredSide;
+		this.hoveredSide = this.closeNanos < 0L && this.pressPanel == null ? sideButtonAt(mouseX, mouseY) : null;
+		if (this.hoveredSide != null && this.hoveredSide != hoverBefore) UiSounds.hover();
 		super.render(g, mouseX, mouseY, partialTick);
 		float time = time();
 		// a janela sendo arrastada fica por cima de todas (com os itens dela)
@@ -441,6 +487,7 @@ public abstract class IsekaiMenuScreen<T extends AbstractContainerMenu> extends 
 			Draw.pop(g);
 		}
 		renderOverlay(g, mouseX, mouseY, partialTick);
+		if (this.hoveredSide != null) this.setTooltipForNextRenderPass(this.hoveredSide.tooltip());
 		if (this.closeNanos < 0L && this.pressPanel == null && overlayAt(mouseX, mouseY) == null) this.renderTooltip(g, mouseX, mouseY);
 	}
 
@@ -478,6 +525,7 @@ public abstract class IsekaiMenuScreen<T extends AbstractContainerMenu> extends 
 			Panels.panel(g, this.font, p.now, p.alpha, p.progress, p.title, time);
 		}
 		drawPanel(g, p, partialTick, mouseX, mouseY);
+		drawSideButtons(g, p);
 		if (p == this.pressPanel && this.dragging) {
 			Rect a = p.grabArea();
 			Draw.sprite(g, Theme.MAP_FRAME_GLOW, a.x() - 3, a.y() - 3, a.w() + 6, a.h() + 6, 0.8f);
@@ -527,6 +575,14 @@ public abstract class IsekaiMenuScreen<T extends AbstractContainerMenu> extends 
 	@Override
 	public boolean mouseClicked(double mouseX, double mouseY, int button) {
 		if (this.closeNanos >= 0L) return true;
+		if (button == 0) {
+			SideButton side = sideButtonAt(mouseX, mouseY);
+			if (side != null) {
+				UiSounds.click();
+				side.action().run();
+				return true;
+			}
+		}
 		Panel over = overlayAt(mouseX, mouseY);
 		if (this.hoveredSlot == null || over != null) {
 			Panel p = over != null ? over : panelAt(mouseX, mouseY);
@@ -597,6 +653,6 @@ public abstract class IsekaiMenuScreen<T extends AbstractContainerMenu> extends 
 
 	@Override
 	protected boolean hasClickedOutside(double mouseX, double mouseY, int left, int top, int button) {
-		return panelAt(mouseX, mouseY) == null;
+		return panelAt(mouseX, mouseY) == null && sideButtonAt(mouseX, mouseY) == null;
 	}
 }

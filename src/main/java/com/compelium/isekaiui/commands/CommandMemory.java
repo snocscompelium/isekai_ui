@@ -144,6 +144,26 @@ public final class CommandMemory {
 		mc.player.connection.sendCommand(e.command);
 	}
 
+	/** Comando anotado a mao (lista de comandos rapidos, botao "+"). Ja entra fixado na barra se pedir. */
+	public static Entry addManual(String text) {
+		if (text == null) return null;
+		String cmd = text.strip();
+		while (cmd.startsWith("/")) cmd = cmd.substring(1).strip();
+		if (cmd.isEmpty()) return null;
+		ensureLoaded();
+		Entry e = find(cmd);
+		if (e == null) {
+			e = new Entry();
+			e.command = cmd;
+			e.label = prettify(cmd);
+			e.icon = guessIcon(cmd);
+			entries.add(e);
+		}
+		e.lastUsed = System.currentTimeMillis();
+		save();
+		return e;
+	}
+
 	private static Entry find(String command) {
 		for (Entry e : entries) if (e.command.equalsIgnoreCase(command)) return e;
 		return null;

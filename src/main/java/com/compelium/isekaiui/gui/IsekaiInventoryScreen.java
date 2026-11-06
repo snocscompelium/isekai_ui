@@ -2,6 +2,7 @@ package com.compelium.isekaiui.gui;
 
 import com.compelium.isekaiui.anim.Ease;
 import com.compelium.isekaiui.client.IsekaiKeys;
+import com.compelium.isekaiui.client.ReturnToContainer;
 import com.compelium.isekaiui.client.UiSounds;
 import com.compelium.isekaiui.commands.CommandMemory;
 import com.compelium.isekaiui.config.IsekaiConfig;
@@ -14,7 +15,6 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
-import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.InventoryMenu;
@@ -30,11 +30,9 @@ import java.util.Map;
  */
 public class IsekaiInventoryScreen extends IsekaiMenuScreen<InventoryMenu> {
 	private static final float TO_MAP_SECONDS = 0.14f;
-	private static final int ROW_H = 16;
-	private static final int MAX_ROWS = 7;
-	private static final int COMMANDS_W = 176;
+	private static final int COMMANDS_W = CommandList.WIDTH;
 	private static boolean vanillaBypass;
-	private static boolean commandsOpen;
+	static boolean commandsOpen;
 
 	private final List<BarButton> buttons = new ArrayList<>();
 	private final MapView miniView = new MapView();
@@ -47,9 +45,7 @@ public class IsekaiInventoryScreen extends IsekaiMenuScreen<InventoryMenu> {
 	private Panel commands;
 	private int hoveredButton = -1;
 	private boolean miniHovered;
-	private int commandsScroll;
-	private int hoveredRow = -1;
-	private int hoveredPart;
+	private CommandList commandList;
 	/** Momento (segundos desde que a tela abriu) em que a lista de comandos foi aberta, para animar a entrada. */
 	private float commandsAppearAt;
 
@@ -96,8 +92,26 @@ public class IsekaiInventoryScreen extends IsekaiMenuScreen<InventoryMenu> {
 		this.mini = addPanel("minimap", 0.09f, 0, -18, false, regionName(), L.mini.grow(5));
 		this.mini.padBottom = 12;
 		this.bar = addPanel("bar", 0.17f, 0, 16, false, null, L.bar);
-		int rows = Math.max(1, Math.min(MAX_ROWS, CommandMemory.entries().size()));
-		int h = 8 + rows * ROW_H + 8;
+		if (this.commandList == null) this.commandList = new CommandList(this.font, new CommandList.Host() {
+			@Override
+			public void addInput(net.minecraft.client.gui.components.EditBox box) {
+				addWidget(box);
+				setFocused(box);
+			}
+
+			@Override
+			public void removeInput(net.minecraft.client.gui.components.EditBox box) {
+				removeWidget(box);
+				setFocused(null);
+			}
+
+			@Override
+			public void commandsChanged() {
+				rebuildWidgets();
+			}
+		});
+		else this.commandList.stopTyping(false);
+		int h = CommandList.height();
 		Rect cmdDef = new Rect(L.bar.cx() - COMMANDS_W / 2, L.bar.y() - 10 - h, COMMANDS_W, h);
 		this.commands = addPanel("commands", this.commandsAppearAt, 0, 10, true, Component.translatable("isekai_ui.panel.commands"), cmdDef);
 		this.commands.overlay = true;
@@ -113,6 +127,9 @@ public class IsekaiInventoryScreen extends IsekaiMenuScreen<InventoryMenu> {
 				Component.translatable(third ? "isekai_ui.button.camera.third" : "isekai_ui.button.camera.first"),
 				this::toggleCamera, third));
 		this.buttons.add(new BarButton("list", Component.translatable("isekai_ui.button.commands"), this::toggleCommands, commandsOpen));
+		if (ReturnToContainer.available()) {
+			this.buttons.add(new BarButton("chest", Component.translatable("isekai_ui.button.back_to_chest"), this::returnToChest, false));
+		}
 		for (CommandMemory.Entry e : CommandMemory.pinned()) {
 			this.buttons.add(new BarButton(e.icon, Component.literal(e.label + "  (/" + e.command + ")"), () -> CommandMemory.run(e), false));
 		}
@@ -145,7 +162,7 @@ public class IsekaiInventoryScreen extends IsekaiMenuScreen<InventoryMenu> {
 
 	/** Quantos botoes a barra vai ter (fixos + comandos com pin + botoes do arquivo de configuracao). */
 	private static int expectedButtonCount() {
-		int n = 3 + CommandMemory.pinned().size();
+		int n = 3 + CommandMemory.pinned().size() + (ReturnToContainer.available() ? 1 : 0);
 		for (IsekaiConfig.MenuButton b : IsekaiConfig.get().menuButtons) {
 			if (b != null && b.command != null && !b.command.isBlank()) n++;
 		}
@@ -185,8 +202,13 @@ public class IsekaiInventoryScreen extends IsekaiMenuScreen<InventoryMenu> {
 
 	/** Retangulo do alfinete (pin) de uma linha da lista de comandos. */
 	public Rect debugCommandPinRect(int row) {
-		Rect r = rowRect(this.commands, row);
-		return new Rect(r.right() - 30, r.y() + 2, 12, 12);
+		return this.commandList.debugPinRect(this.commands.now, row);
+	}
+
+	/** Usado pelos testes automaticos: anota um comando pelo botao "+" e aperta Enter. */
+	public void debugAddCommand(String text) {
+		this.commandList.debugType(text);
+		this.commandList.stopTyping(true);
 	}
 
 	public int debugButtonCount() {
@@ -216,10 +238,18 @@ public class IsekaiInventoryScreen extends IsekaiMenuScreen<InventoryMenu> {
 
 	private void toggleCommands() {
 		commandsOpen = !commandsOpen;
-		this.commandsScroll = 0;
 		this.commandsAppearAt = time();
 		UiSounds.toggle();
 		this.rebuildWidgets();
+	}
+
+	/** Fecha o inventario e da um clique direito no bau que ainda esta na mira (o mesmo que fazer a mao). */
+	private void returnToChest() {
+		if (isClosing()) return;
+		startClosing(CLOSE_SECONDS, null, () -> {
+			if (this.minecraft.player != null) this.minecraft.player.closeContainer();
+			ReturnToContainer.scheduleReopen();
+		});
 	}
 
 	// ------------------------------------------------------------------ desenho
@@ -254,7 +284,7 @@ public class IsekaiInventoryScreen extends IsekaiMenuScreen<InventoryMenu> {
 		} else if (p == this.bar) {
 			drawBar(g, p, mouseX, mouseY);
 		} else if (p == this.commands) {
-			drawCommands(g, p, mouseX, mouseY);
+			this.commandList.draw(g, p.now, p.alpha, mouseX, mouseY, partialTick, !isClosing() && !isDraggingPanel());
 		}
 	}
 
@@ -302,58 +332,6 @@ public class IsekaiInventoryScreen extends IsekaiMenuScreen<InventoryMenu> {
 		if (this.hoveredButton >= 0 && this.hoveredButton != before) UiSounds.hover();
 	}
 
-	private Rect rowRect(Panel p, int row) {
-		return new Rect(p.now.x() + 6, p.now.y() + 8 + row * ROW_H, p.now.w() - 12, ROW_H);
-	}
-
-	private void drawCommands(GuiGraphics g, Panel p, int mouseX, int mouseY) {
-		float a = p.alpha;
-		List<CommandMemory.Entry> list = CommandMemory.entries();
-		this.hoveredRow = -1;
-		this.hoveredPart = 0;
-		if (list.isEmpty()) {
-			List<FormattedCharSequence> lines = this.font.split(Component.translatable("isekai_ui.commands.empty"), p.now.w() - 16);
-			int y = p.now.y() + 9;
-			for (FormattedCharSequence line : lines) {
-				if (y > p.now.bottom() - 9) break;
-				g.drawString(this.font, line, p.now.x() + 8, y, Draw.alpha(Theme.TEXT_DIM, a), false);
-				y += 10;
-			}
-			return;
-		}
-		this.commandsScroll = Mth.clamp(this.commandsScroll, 0, Math.max(0, list.size() - MAX_ROWS));
-		boolean canHover = !isClosing() && !isDraggingPanel();
-		for (int row = 0; row < MAX_ROWS; row++) {
-			int idx = row + this.commandsScroll;
-			if (idx >= list.size()) break;
-			CommandMemory.Entry e = list.get(idx);
-			Rect r = rowRect(p, row);
-			boolean hover = canHover && r.contains(mouseX, mouseY);
-			Rect pin = new Rect(r.right() - 30, r.y() + 2, 12, 12);
-			Rect del = new Rect(r.right() - 14, r.y() + 2, 12, 12);
-			if (hover) {
-				this.hoveredRow = idx;
-				this.hoveredPart = pin.contains(mouseX, mouseY) ? 1 : (del.contains(mouseX, mouseY) ? 2 : 0);
-				Draw.fill(g, r.x(), r.y(), r.right(), r.bottom(), Draw.alpha(0x30FFF2CF, a));
-			}
-			Draw.sprite(g, Theme.icon(e.icon), r.x() + 2, r.y() + 2, 12, 12, Draw.alpha(Theme.IVORY, a));
-			Component label = Component.literal(e.label);
-			String text = this.font.plainSubstrByWidth(label.getString(), r.w() - 54);
-			Draw.text(g, this.font, Component.literal(text), r.x() + 18, r.y() + 4, Draw.alpha(e.pinned ? Theme.TEXT_GOLD : Theme.TEXT, a), false);
-			int pinColor = e.pinned ? 0xFFF2C76A : (hover && this.hoveredPart == 1 ? Theme.IVORY : 0xFF7E7566);
-			Draw.sprite(g, Theme.icon("pin"), pin.x(), pin.y(), 12, 12, Draw.alpha(pinColor, a));
-			int delColor = hover && this.hoveredPart == 2 ? 0xFFE0465E : 0xFF7E7566;
-			Draw.sprite(g, Theme.icon("close"), del.x(), del.y(), 12, 12, Draw.alpha(delColor, a));
-		}
-		if (list.size() > MAX_ROWS) {
-			int total = list.size();
-			int trackH = p.now.h() - 16;
-			int barH = Math.max(8, trackH * MAX_ROWS / total);
-			int barY = p.now.y() + 8 + (trackH - barH) * this.commandsScroll / Math.max(1, total - MAX_ROWS);
-			Draw.fill(g, p.now.right() - 4, barY, p.now.right() - 2, barY + barH, Draw.alpha(Theme.GOLD, a * 0.8f));
-		}
-	}
-
 	@Override
 	protected void renderOverlay(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
 		if (isClosing() || isDraggingPanel()) return;
@@ -361,14 +339,9 @@ public class IsekaiInventoryScreen extends IsekaiMenuScreen<InventoryMenu> {
 			this.setTooltipForNextRenderPass(this.buttons.get(this.hoveredButton).tooltip());
 		} else if (this.miniHovered) {
 			this.setTooltipForNextRenderPass(Component.translatable("isekai_ui.map.open_hint", IsekaiKeys.mapKeyName()));
-		} else if (this.hoveredRow >= 0) {
-			List<CommandMemory.Entry> list = CommandMemory.entries();
-			if (this.hoveredRow < list.size()) {
-				CommandMemory.Entry e = list.get(this.hoveredRow);
-				String key = this.hoveredPart == 1 ? (e.pinned ? "isekai_ui.commands.unpin" : "isekai_ui.commands.pin")
-						: this.hoveredPart == 2 ? "isekai_ui.commands.delete" : "isekai_ui.commands.run";
-				this.setTooltipForNextRenderPass(Component.translatable(key, "/" + e.command));
-			}
+		} else if (this.commands != null && this.commands.visible && this.commandList.tooltip() != null
+				&& this.commands.grabArea().contains(mouseX, mouseY)) {
+			this.setTooltipForNextRenderPass(this.commandList.tooltip());
 		}
 	}
 
@@ -401,43 +374,14 @@ public class IsekaiInventoryScreen extends IsekaiMenuScreen<InventoryMenu> {
 			}
 			return false;
 		}
-		if (p == this.commands) {
-			List<CommandMemory.Entry> list = CommandMemory.entries();
-			for (int row = 0; row < MAX_ROWS; row++) {
-				int idx = row + this.commandsScroll;
-				if (idx >= list.size()) break;
-				Rect r = rowRect(p, row);
-				if (!r.contains(mouseX, mouseY)) continue;
-				CommandMemory.Entry e = list.get(idx);
-				if (button == 1) {
-					CommandMemory.cycleIcon(e);
-					UiSounds.toggle();
-					this.rebuildWidgets();
-					return true;
-				}
-				if (new Rect(r.right() - 30, r.y() + 2, 12, 12).contains(mouseX, mouseY)) {
-					CommandMemory.togglePin(e);
-					UiSounds.toggle();
-					this.rebuildWidgets();
-				} else if (new Rect(r.right() - 14, r.y() + 2, 12, 12).contains(mouseX, mouseY)) {
-					CommandMemory.remove(e);
-					UiSounds.click();
-					this.rebuildWidgets();
-				} else {
-					UiSounds.click();
-					CommandMemory.run(e);
-				}
-				return true;
-			}
-		}
+		if (p == this.commands) return this.commandList.click(p.now, mouseX, mouseY, button);
 		return false;
 	}
 
 	@Override
 	public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
 		if (this.commands != null && this.commands.visible && this.commands.grabArea().contains(mouseX, mouseY)) {
-			this.commandsScroll -= (int) Math.signum(scrollY);
-			return true;
+			return this.commandList.scroll(scrollY);
 		}
 		return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
 	}
@@ -445,6 +389,7 @@ public class IsekaiInventoryScreen extends IsekaiMenuScreen<InventoryMenu> {
 	@Override
 	public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
 		if (isClosing()) return true;
+		if (this.commandList != null && this.commandList.isTyping()) return this.commandList.keyPressed(keyCode, scanCode, modifiers);
 		if (IsekaiKeys.isMapKey(keyCode, scanCode)) {
 			openMap();
 			return true;

@@ -123,6 +123,19 @@ public final class MapManager {
 		return FabricLoader.getInstance().getGameDir().resolve("isekai_ui").resolve("maps");
 	}
 
+	/** Marcadores de uma dimensao deste servidor (a atual ou outra, ex.: marcador do Nether recebido no chat). */
+	public static Waypoints waypointsFor(String dimensionId) {
+		String key = serverKey(Minecraft.getInstance()) + "/" + sanitize(dimensionId);
+		if (current != null && key.equals(currentKey)) return current.waypoints();
+		return new Waypoints(baseDir().resolve(key));
+	}
+
+	/** Dimensao atual ("minecraft:overworld"...), ou null fora de um mundo. */
+	public static String currentDimension() {
+		Minecraft mc = Minecraft.getInstance();
+		return mc.level == null ? null : mc.level.dimension().location().toString();
+	}
+
 	/** Pasta com os dados de um servidor (mapas por dimensao, comandos, simbolos de reino). */
 	public static Path serverDir(String serverKey) {
 		return baseDir().resolve(serverKey);

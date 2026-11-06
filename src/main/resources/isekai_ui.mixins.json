@@ -4,12 +4,17 @@
 	"package": "com.compelium.isekaiui.mixin",
 	"compatibilityLevel": "JAVA_21",
 	"client": [
+		"AbstractFurnaceMenuAccessor",
+		"BundleItemMixin",
 		"CameraMixin",
-		"EntityRendererMixin",
+		"ChatComponentMixin",
+		"ClientPacketListenerMixin",
 		"EntityRenderStateMixin",
+		"EntityRendererMixin",
 		"GuiMixin",
 		"HumanoidModelMixin",
 		"ItemMixin",
+		"MinecraftAccessor",
 		"MinecraftMixin",
 		"ShulkerBoxBlockMixin",
 		"SlotAccessor"

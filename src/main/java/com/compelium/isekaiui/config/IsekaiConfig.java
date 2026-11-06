@@ -30,6 +30,10 @@ public final class IsekaiConfig {
 	public boolean enableContainers = true;
 	/** Mostra os itens de dentro da shulker box ao passar o mouse sobre ela. */
 	public boolean shulkerPreview = true;
+	/** Mesa de trabalho, fornalhas, bigorna, ferraria, rebolo, cortador, alquimia e encantamento no estilo isekai. */
+	public boolean enableStations = true;
+	/** Inventario do modo criativo no estilo isekai (catalogo, bau pessoal e comandos anotados). */
+	public boolean enableCreative = true;
 	/** Camera em terceira pessoa ao abrir o inventario (F5 dentro do inventario alterna). */
 	public boolean thirdPersonCamera = true;
 	/** Personagem levanta os bracos "mexendo" na janela. */
@@ -62,6 +66,10 @@ public final class IsekaiConfig {
 		public boolean showClaims = true;
 		public boolean showGrid = true;
 		public boolean showWaypoints = true;
+		/** Botao [+ Marcador] nas mensagens do chat com marcadores de outros mods de mapa. */
+		public boolean chatWaypoints = true;
+		/** Formato do "Compartilhar no chat": "xaero" (Xaero's Minimap) ou "journeymap" (JourneyMap/VoxelMap). */
+		public String shareFormat = "xaero";
 		/** Pixels de interface por bloco no minimapa. */
 		public float minimapZoom = 1.0f;
 		/** Pixels de interface por bloco ao abrir o mapa grande. */
@@ -137,6 +145,7 @@ public final class IsekaiConfig {
 		if (lands.wildernessPatterns == null) lands.wildernessPatterns = new ArrayList<>();
 		if (lands.landPattern == null || lands.landPattern.isBlank()) lands.landPattern = "^\\s*(?<land>.+?)\\s*$";
 		if (lands.requiredColor == null) lands.requiredColor = "";
+		if (map.shareFormat == null || map.shareFormat.isBlank()) map.shareFormat = "xaero";
 		map.exploreRadiusChunks = clamp(map.exploreRadiusChunks, 1, 16);
 		map.minimapZoom = clamp(map.minimapZoom, 0.25f, 4f);
 		map.mapZoom = clamp(map.mapZoom, 0.0625f, 6f);
