@@ -64,7 +64,7 @@ public class IsekaiClientGameTest implements FabricClientGameTest {
 			}
 			ctx.runOnClient(mc -> mc.gui.setTitle(Component.literal("Wilderness").withStyle(ChatFormatting.DARK_GREEN, ChatFormatting.BOLD)));
 			server.runCommand("execute as @a at @s run tp @s ~ ~ ~-16");
-			ctx.runOnClient(mc -> mc.gui.clear());
+			ctx.runOnClient(mc -> mc.gui.clearTitles());
 			ctx.waitTicks(40);
 			ctx.takeScreenshot("isekai-00-mundo");
 

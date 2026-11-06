@@ -1,0 +1,37 @@
+{
+  "ui.window_open": {
+    "sounds": [
+      "isekai_ui:ui/window_open"
+    ]
+  },
+  "ui.window_close": {
+    "sounds": [
+      "isekai_ui:ui/window_close"
+    ]
+  },
+  "ui.hover": {
+    "sounds": [
+      "isekai_ui:ui/hover"
+    ]
+  },
+  "ui.click": {
+    "sounds": [
+      "isekai_ui:ui/click"
+    ]
+  },
+  "ui.toggle": {
+    "sounds": [
+      "isekai_ui:ui/toggle"
+    ]
+  },
+  "ui.map_open": {
+    "sounds": [
+      "isekai_ui:ui/map_open"
+    ]
+  },
+  "ui.map_close": {
+    "sounds": [
+      "isekai_ui:ui/map_close"
+    ]
+  }
+}
