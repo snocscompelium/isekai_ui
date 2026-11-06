@@ -29,6 +29,8 @@ public class IsekaiClientGameTest implements FabricClientGameTest {
 		// mundo plano (rapido de gerar no GitHub); o cenario de teste e montado com comandos
 		try (TestSingleplayerContext sp = ctx.worldBuilder().create()) {
 			TestServerContext server = sp.getServer();
+			// garante o jogador em cima do chao (no mundo plano do teste ele nasce afundado 1 bloco)
+			server.runCommand("execute as @a at @s positioned over world_surface run tp @s ~ ~ ~");
 			server.runCommand("gamerule doDaylightCycle false");
 			server.runCommand("gamerule doWeatherCycle false");
 			server.runCommand("gamerule doMobSpawning false");
@@ -59,12 +61,12 @@ public class IsekaiClientGameTest implements FabricClientGameTest {
 
 			// simula o titulo do plugin Lands e anda por alguns chunks dentro do "terreno"
 			ctx.runOnClient(mc -> mc.gui.setTitle(Component.literal("Reino de Aurora").withStyle(ChatFormatting.DARK_GREEN, ChatFormatting.BOLD)));
-			for (String step : new String[]{"~16 ~ ~", "~16 ~ ~", "~ ~ ~16", "~-16 ~ ~", "~-16 ~ ~"}) {
+			for (String step : new String[]{"~ ~ ~-16", "~-16 ~ ~", "~ ~ ~-16", "~16 ~ ~"}) {
 				server.runCommand("execute as @a at @s run tp @s " + step);
 				ctx.waitTicks(4);
 			}
 			ctx.runOnClient(mc -> mc.gui.setTitle(Component.literal("Wilderness").withStyle(ChatFormatting.DARK_GREEN, ChatFormatting.BOLD)));
-			server.runCommand("execute as @a at @s run tp @s ~ ~ ~-16");
+			server.runCommand("execute as @a at @s run tp @s ~ ~ ~32");
 			ctx.runOnClient(mc -> mc.gui.clearTitles());
 			ctx.waitTicks(40);
 			ctx.takeScreenshot("isekai-00-mundo");

@@ -31,9 +31,9 @@ public final class IsekaiConfig {
 	/** Esconde o item da mao enquanto o personagem mexe na janela. */
 	public boolean hideHeldItemsWhileBrowsing = true;
 	/** Quanto a camera fica atras do personagem (blocos). */
-	public float cameraDistance = 1.1f;
+	public float cameraDistance = 1.2f;
 	/** Quanto a camera fica para a direita do personagem (blocos). Negativo = esquerda. */
-	public float cameraSide = 2.7f;
+	public float cameraSide = 3.0f;
 	public float cameraHeight = -0.15f;
 	/** Posicao horizontal do personagem na tela com a camera em 3a pessoa (0 = esquerda, 0.5 = centro). */
 	public float characterScreenX = 0.24f;
