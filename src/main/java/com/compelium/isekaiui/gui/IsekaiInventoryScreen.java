@@ -259,7 +259,7 @@ public class IsekaiInventoryScreen extends IsekaiMenuScreen<InventoryMenu> {
 		Draw.fill(g, map.x() - 2, map.y() + 3, map.right() + 6, map.bottom() + 9, Draw.alpha(Theme.SHADOW, a));
 		MapRenderer.draw(g, MapManager.current(), this.miniView, map, a, partialTick, true);
 		Draw.sprite(g, Theme.MAP_FRAME, p.now.x(), p.now.y(), p.now.w(), p.now.h(), a);
-		boolean hover = !isClosing() && !isDragging() && p.now.contains(mouseX, mouseY) && overlayAt(mouseX, mouseY) == null;
+		boolean hover = !isClosing() && !isDraggingPanel() && p.now.contains(mouseX, mouseY) && overlayAt(mouseX, mouseY) == null;
 		if (hover && !this.miniHovered) UiSounds.hover();
 		this.miniHovered = hover;
 		if (hover) {
@@ -281,7 +281,7 @@ public class IsekaiInventoryScreen extends IsekaiMenuScreen<InventoryMenu> {
 	private void drawBar(GuiGraphics g, Panel p, int mouseX, int mouseY) {
 		int before = this.hoveredButton;
 		this.hoveredButton = -1;
-		boolean canHover = !isClosing() && !isDragging() && overlayAt(mouseX, mouseY) == null;
+		boolean canHover = !isClosing() && !isDraggingPanel() && overlayAt(mouseX, mouseY) == null;
 		for (int i = 0; i < this.buttons.size(); i++) {
 			float pi = Ease.clamp01(p.progress * 1.4f - i * 0.12f);
 			Rect b = buttonRect(p.now, i).offset(0, slide(pi, 10));
@@ -313,7 +313,7 @@ public class IsekaiInventoryScreen extends IsekaiMenuScreen<InventoryMenu> {
 			return;
 		}
 		this.commandsScroll = Mth.clamp(this.commandsScroll, 0, Math.max(0, list.size() - MAX_ROWS));
-		boolean canHover = !isClosing() && !isDragging();
+		boolean canHover = !isClosing() && !isDraggingPanel();
 		for (int row = 0; row < MAX_ROWS; row++) {
 			int idx = row + this.commandsScroll;
 			if (idx >= list.size()) break;
@@ -347,7 +347,7 @@ public class IsekaiInventoryScreen extends IsekaiMenuScreen<InventoryMenu> {
 
 	@Override
 	protected void renderOverlay(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
-		if (isClosing() || isDragging()) return;
+		if (isClosing() || isDraggingPanel()) return;
 		if (this.hoveredButton >= 0 && this.hoveredButton < this.buttons.size()) {
 			this.setTooltipForNextRenderPass(this.buttons.get(this.hoveredButton).tooltip());
 		} else if (this.miniHovered) {

@@ -430,7 +430,7 @@ public abstract class IsekaiMenuScreen<T extends AbstractContainerMenu> extends 
 		return null;
 	}
 
-	protected boolean isDragging() {
+	protected boolean isDraggingPanel() {
 		return this.dragging;
 	}
 
