@@ -1,6 +1,7 @@
 package com.compelium.isekaiui.map;
 
 import com.compelium.isekaiui.IsekaiUI;
+import com.compelium.isekaiui.gui.Theme;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
@@ -11,10 +12,12 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 
 /**
@@ -72,9 +75,21 @@ public final class Kingdoms {
 		return new ArrayList<>(all.values());
 	}
 
+	/** Novo reino ganha uma cor da lista que nenhum outro reino esteja usando (da para trocar depois). */
 	public static void add(String name) {
 		if (name == null || name.isBlank() || find(name) != null) return;
-		known.put(name.strip(), -1);
+		Set<Integer> used = new HashSet<>();
+		for (Map.Entry<String, Integer> e : known.entrySet()) {
+			used.add(e.getValue() != null && e.getValue() >= 0 ? e.getValue() : Theme.landColor(e.getKey()));
+		}
+		int pick = -1;
+		for (int c : COLORS) {
+			if (!used.contains(c)) {
+				pick = c;
+				break;
+			}
+		}
+		known.put(name.strip(), pick);
 		save();
 	}
 

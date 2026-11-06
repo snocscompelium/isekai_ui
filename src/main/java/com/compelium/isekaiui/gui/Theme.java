@@ -59,7 +59,7 @@ public final class Theme {
 			"star", "sword", "paw", "scroll", "coin", "house", "book", "gear", "people", "flag", "compass", "potion",
 			"list", "pin", "gem", "skull", "tree", "pickaxe", "anchor", "portal", "tower",
 			"craft", "chest", "flame", "trash", "search", "plus", "catalog", "chat", "next", "prev", "potion_rack",
-			"sun", "moon", "armor");
+			"sun", "moon", "armor", "brush");
 
 	public static ResourceLocation icon(String name) {
 		return IsekaiUI.id("icon/" + (ICONS.contains(name) ? name : "star"));

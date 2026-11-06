@@ -25,6 +25,7 @@ public final class Panels {
 			Component t = upper(title);
 			int w = font.width(t) + 18;
 			int x = w <= r.w() - 12 ? r.x() + 8 : r.cx() - w / 2;
+			x = Mth.clamp(x, 2, Math.max(2, g.guiWidth() - w - 2));
 			tab(g, font, x, r.y() - InventoryLayout.TAB + 1, w, t, alpha);
 		}
 		// linha de "materializacao" descendo pela janela enquanto ela abre

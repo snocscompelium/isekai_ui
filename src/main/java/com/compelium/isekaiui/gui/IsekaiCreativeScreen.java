@@ -719,7 +719,7 @@ public class IsekaiCreativeScreen extends IsekaiMenuScreen<InventoryMenu> {
 			boolean active = (m == 1) == personalMode;
 			boolean hover = canHover && r.contains(mouseX, mouseY);
 			if (hover) this.hoveredMode = m;
-			Panels.tab(g, this.font, r.x(), r.y(), r.w(), modeLabel(m, c), a * (active ? 1f : (hover ? 0.8f : 0.45f)));
+			drawModeTab(g, r, modeLabel(m, c), active, hover, a);
 		}
 
 		// abas pequenas: categorias do catalogo ou abas do bau pessoal
@@ -813,6 +813,25 @@ public class IsekaiCreativeScreen extends IsekaiMenuScreen<InventoryMenu> {
 			Draw.fill(g, c.x() + 6, ty - 3, c.right() - 6, ty + 11, Draw.alpha(0xB00A080E, a));
 			Draw.textFit(g, this.font, empty, c.cx(), ty, c.w() - 20, Draw.alpha(Theme.TEXT_DIM, a), false);
 		}
+	}
+
+	/** Aba do titulo: a ativa e marfim (como as outras janelas); a de tras e de vidro escuro com borda dourada. */
+	private void drawModeTab(GuiGraphics g, Rect r, Component label, boolean active, boolean hover, float a) {
+		if (active) {
+			Panels.tab(g, this.font, r.x(), r.y(), r.w(), label, a);
+			return;
+		}
+		int edge = Draw.alpha(hover ? Theme.GOLD : 0xFF6E5B3A, a);
+		Draw.fill(g, r.x() + 1, r.y() + 1, r.right() - 1, r.bottom() - 2, Draw.alpha(0xE01A1622, a));
+		Draw.fill(g, r.x() + 2, r.y(), r.right() - 2, r.y() + 1, edge);
+		Draw.fill(g, r.x(), r.y() + 2, r.x() + 1, r.bottom() - 2, edge);
+		Draw.fill(g, r.right() - 1, r.y() + 2, r.right(), r.bottom() - 2, edge);
+		Component t = label;
+		int maxText = r.w() - 14;
+		if (this.font.width(t) > maxText) {
+			t = Component.literal(this.font.plainSubstrByWidth(t.getString(), Math.max(0, maxText - this.font.width("..."))) + "...");
+		}
+		Draw.textCentered(g, this.font, t, r.x() + r.w() / 2, r.y() + 3, Draw.alpha(hover ? Theme.TEXT_GOLD : Theme.TEXT_DIM, a), false);
 	}
 
 	private void drawMinimap(GuiGraphics g, Panel p, float partialTick, int mouseX, int mouseY, boolean canHover) {

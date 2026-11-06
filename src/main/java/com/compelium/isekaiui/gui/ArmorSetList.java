@@ -99,10 +99,10 @@ public final class ArmorSetList {
 			if (a > 0.5f) {
 				for (int k = 0; k < 4; k++) {
 					ItemStack piece = set.pieces[k];
-					if (!piece.isEmpty()) g.renderItem(piece, r.x() + 1 + k * 13, r.y() + 1);
+					if (!piece.isEmpty()) g.renderItem(piece, r.x() + 1 + k * 14, r.y() + 1);
 				}
 			}
-			int textX = r.x() + 56;
+			int textX = r.x() + 63;
 			if (this.input != null && set == this.renaming) {
 				Draw.fill(g, textX - 2, r.y() + 2, r.right() - 16, r.bottom() - 2, Draw.alpha(0xC00A080E, a));
 				Draw.fill(g, textX - 2, r.bottom() - 3, r.right() - 16, r.bottom() - 2, Draw.alpha(Theme.GOLD, a * 0.8f));
@@ -126,8 +126,7 @@ public final class ArmorSetList {
 		}
 		Component line = this.status != null && System.nanoTime() - this.statusNanos < 4_000_000_000L
 				? this.status : Component.translatable(this.host.creative() ? "isekai_ui.armor.hint_creative" : "isekai_ui.armor.hint_survival");
-		String s = this.font.plainSubstrByWidth(line.getString(), p.w() - 14);
-		Draw.text(g, this.font, Component.literal(s), p.x() + 7, p.bottom() - 15, Draw.alpha(Theme.TEXT_DIM, a), false);
+		Draw.textFit(g, this.font, line, p.cx(), p.bottom() - 15, p.w() - 14, Draw.alpha(Theme.TEXT_DIM, a), false);
 	}
 
 	/** Clique dentro da janela. Devolve true se usou o clique. */

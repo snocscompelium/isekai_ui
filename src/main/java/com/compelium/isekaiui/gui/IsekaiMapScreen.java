@@ -132,7 +132,7 @@ public class IsekaiMapScreen extends Screen {
 		this.buttons.add(new MapButton("entities", Component.translatable("isekai_ui.button.entities"), () -> toggle(() -> ms.showEntities = !ms.showEntities), () -> ms.showEntities));
 		this.buttons.add(new MapButton("claims", Component.translatable("isekai_ui.button.claims"), () -> toggle(() -> ms.showClaims = !ms.showClaims), () -> ms.showClaims));
 		this.buttons.add(new MapButton("pin", Component.translatable("isekai_ui.button.waypoints"), () -> toggle(() -> ms.showWaypoints = !ms.showWaypoints), () -> ms.showWaypoints));
-		this.buttons.add(new MapButton("flag", Component.translatable("isekai_ui.button.territories"), this::toggleTerritoryMode, () -> this.territoryMode));
+		this.buttons.add(new MapButton("brush", Component.translatable("isekai_ui.button.territories"), this::toggleTerritoryMode, () -> this.territoryMode));
 		this.buttons.add(new MapButton("grid", Component.translatable("isekai_ui.button.grid"), () -> toggle(() -> ms.showGrid = !ms.showGrid), () -> ms.showGrid));
 		if (this.territory == null) {
 			this.territory = new TerritoryPanel(this.font, new TerritoryPanel.Host() {

@@ -647,6 +647,9 @@ public class IsekaiClientGameTest implements FabricClientGameTest {
 				mc.player.xRotO = 0f;
 			});
 			ctx.waitTicks(15);
+			ctx.runOnClient(mc -> mc.gui.getChat().clearMessages(false));
+			int armorValue = ctx.computeOnClient(mc -> mc.player.getArmorValue());
+			System.out.println("[isekai-test] armadura no cliente depois do criativo: " + armorValue);
 			boolean instruments = ctx.computeOnClient(mc -> Instruments.hasCompass() && Instruments.hasClock() && !Instruments.holdingCompass());
 			if (!instruments) throw new AssertionError("A bussola na bolsa / relogio na sacola nao foram reconhecidos");
 			ctx.takeScreenshot("isekai-66-hud-com-bussola-e-relogio");

@@ -4,6 +4,7 @@ import com.compelium.isekaiui.IsekaiUI;
 import com.compelium.isekaiui.map.MapManager;
 import net.minecraft.SharedConstants;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.multiplayer.MultiPlayerGameMode;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.HolderLookup;
@@ -22,6 +23,7 @@ import net.minecraft.world.item.ItemStack;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -56,6 +58,9 @@ public final class ArmorSets {
 
 	private static final List<ArmorSet> sets = new ArrayList<>();
 	private static String loadedFor;
+	/** Trocas que faltam fazer no sobrevivencia: {id do menu, slot de onde vem, slot do corpo}. */
+	private static final ArrayDeque<int[]> PENDING = new ArrayDeque<>();
+	private static int cooldown;
 
 	private ArmorSets() {
 	}
@@ -113,6 +118,7 @@ public final class ArmorSets {
 		if (!menu.getCarried().isEmpty() || player.containerMenu != menu) return 0;
 		int missing = 0;
 		boolean[] used = new boolean[menu.slots.size()];
+		PENDING.clear();
 		for (int i = 0; i < PIECES; i++) {
 			ItemStack piece = set.pieces[i];
 			if (piece.isEmpty()) continue;
@@ -124,11 +130,40 @@ public final class ArmorSets {
 				continue;
 			}
 			used[src] = true;
-			gm.handleInventoryMouseClick(menu.containerId, src, 0, ClickType.PICKUP, player);
-			gm.handleInventoryMouseClick(menu.containerId, target, 0, ClickType.PICKUP, player);
-			if (!menu.getCarried().isEmpty()) gm.handleInventoryMouseClick(menu.containerId, src, 0, ClickType.PICKUP, player);
+			PENDING.add(new int[]{menu.containerId, src, target});
 		}
+		cooldown = 0;
+		tick();
 		return missing;
+	}
+
+	/**
+	 * Troca uma peca de cada vez, com uma pausa curtinha entre elas (como uma pessoa rapida faria), para nao
+	 * parecer um "auto-armor" para o anti-cheat do servidor. Para tudo se o inventario fechar ou a mao ocupar.
+	 */
+	public static void tick() {
+		if (PENDING.isEmpty()) return;
+		Minecraft mc = Minecraft.getInstance();
+		LocalPlayer player = mc.player;
+		MultiPlayerGameMode gm = mc.gameMode;
+		if (player == null || gm == null || !(mc.screen instanceof AbstractContainerScreen<?> screen)
+				|| screen.getMenu() != player.containerMenu || !(player.containerMenu instanceof InventoryMenu menu)
+				|| !menu.getCarried().isEmpty() || menu.containerId != PENDING.peek()[0]) {
+			PENDING.clear();
+			return;
+		}
+		if (cooldown > 0) {
+			cooldown--;
+			return;
+		}
+		int[] job = PENDING.poll();
+		int src = job[1];
+		int target = job[2];
+		if (menu.getSlot(src).getItem().isEmpty()) return;
+		gm.handleInventoryMouseClick(menu.containerId, src, 0, ClickType.PICKUP, player);
+		gm.handleInventoryMouseClick(menu.containerId, target, 0, ClickType.PICKUP, player);
+		if (!menu.getCarried().isEmpty()) gm.handleInventoryMouseClick(menu.containerId, src, 0, ClickType.PICKUP, player);
+		cooldown = 2;
 	}
 
 	/** Item com algo alem do normal (nome, lore, encantamento, dados do servidor...). Desgaste nao conta. */

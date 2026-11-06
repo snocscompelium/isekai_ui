@@ -5,6 +5,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
+import net.minecraft.util.Mth;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 
@@ -29,8 +30,10 @@ public final class SkyDial {
 			if (alpha > 0.5f) g.renderItem(CLOCK, cx - 8, cy - 8);
 			Component time = Component.literal(fixed ? "??:??" : clock(day));
 			int w = font.width(time) + 8;
-			Draw.sprite(g, Theme.PILL, cx - w / 2, cy + SIZE / 2 - 2, w, 11, alpha);
-			Draw.textCentered(g, font, time, cx, cy + SIZE / 2, Draw.alpha(Theme.TEXT_GOLD, alpha), false);
+			// a plaquinha da hora nunca sai da tela (o minimapa pode estar encostado na borda)
+			int px = Mth.clamp(cx - w / 2, 1, Math.max(1, g.guiWidth() - w - 1));
+			Draw.sprite(g, Theme.PILL, px, cy + SIZE / 2 - 2, w, 11, alpha);
+			Draw.textCentered(g, font, time, px + w / 2, cy + SIZE / 2, Draw.alpha(Theme.TEXT_GOLD, alpha), false);
 			return;
 		}
 		if (fixed) {
