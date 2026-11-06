@@ -81,9 +81,9 @@ public final class CinematicCamera {
 		return active() ? Ease.inOutCubic(progress) : 0f;
 	}
 
-	/** True quando a camera ainda esta tao perto que veria o interior da cabeca. */
+	/** True quando a camera esta tao perto que atravessaria o corpo do personagem. */
 	public static boolean nearHead() {
-		return active() && distanceFromEye < 0.8;
+		return active() && distanceFromEye < 1.15;
 	}
 
 	public static Result compute(Entity entity, Vec3 vanillaPos, float vanillaYaw, float vanillaPitch, float partialTick) {
@@ -94,14 +94,14 @@ public final class CinematicCamera {
 		double yawRad = Math.toRadians(baseYaw);
 		Vec3 forward = new Vec3(-Math.sin(yawRad), 0, Math.cos(yawRad));
 		Vec3 right = new Vec3(-Math.cos(yawRad), 0, -Math.sin(yawRad));
-		// atras e a DIREITA do personagem (por cima do ombro): assim ele fica virado para as janelas
+		// ao lado DIREITO do personagem (um pouco atras): ele aparece de perfil, virado para as janelas
 		Vec3 desired = eye
 				.add(forward.scale(-cfg.cameraDistance))
 				.add(right.scale(cfg.cameraSide))
 				.add(0, cfg.cameraHeight, 0);
 		Vec3 framed = clip(entity, eye, desired);
 
-		Vec3 look = eye.add(0, -0.8, 0).subtract(framed);
+		Vec3 look = eye.add(0, -0.6, 0).subtract(framed);
 		double horizontal = Math.sqrt(look.x * look.x + look.z * look.z);
 		float yaw = (float) Math.toDegrees(Math.atan2(-look.x, look.z)) + framingYawOffset(cfg.characterScreenX);
 		float pitch = (float) -Math.toDegrees(Math.atan2(look.y, horizontal)) + 2f;

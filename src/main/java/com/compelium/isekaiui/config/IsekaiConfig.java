@@ -30,9 +30,11 @@ public final class IsekaiConfig {
 	public boolean poseCharacter = true;
 	/** Esconde o item da mao enquanto o personagem mexe na janela. */
 	public boolean hideHeldItemsWhileBrowsing = true;
-	public float cameraDistance = 3.1f;
-	public float cameraSide = 1.2f;
-	public float cameraHeight = 0.1f;
+	/** Quanto a camera fica atras do personagem (blocos). */
+	public float cameraDistance = 1.1f;
+	/** Quanto a camera fica para a direita do personagem (blocos). Negativo = esquerda. */
+	public float cameraSide = 2.7f;
+	public float cameraHeight = -0.15f;
 	/** Posicao horizontal do personagem na tela com a camera em 3a pessoa (0 = esquerda, 0.5 = centro). */
 	public float characterScreenX = 0.24f;
 	public boolean animations = true;
@@ -128,8 +130,8 @@ public final class IsekaiConfig {
 		map.exploreRadiusChunks = clamp(map.exploreRadiusChunks, 1, 16);
 		map.minimapZoom = clamp(map.minimapZoom, 0.25f, 4f);
 		map.mapZoom = clamp(map.mapZoom, 0.0625f, 6f);
-		cameraDistance = clamp(cameraDistance, 1.2f, 6f);
-		cameraSide = clamp(cameraSide, -3f, 3f);
+		cameraDistance = clamp(cameraDistance, -4f, 6f);
+		cameraSide = clamp(cameraSide, -6f, 6f);
 		cameraHeight = clamp(cameraHeight, -1f, 2f);
 		characterScreenX = clamp(characterScreenX, 0.05f, 0.95f);
 		uiSoundVolume = clamp(uiSoundVolume, 0f, 1f);

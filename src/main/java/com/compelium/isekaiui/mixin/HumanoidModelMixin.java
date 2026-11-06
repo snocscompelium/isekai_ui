@@ -30,20 +30,27 @@ public abstract class HumanoidModelMixin {
 	@Shadow
 	@Final
 	public ModelPart leftArm;
+	@Shadow
+	@Final
+	public ModelPart body;
+	@Shadow
+	@Final
+	public ModelPart rightLeg;
+	@Shadow
+	@Final
+	public ModelPart leftLeg;
 
 	@Unique
-	private boolean isekai$headHidden;
+	private boolean isekai$hidden;
 	@Unique
-	private boolean isekai$prevHeadVisible = true;
-	@Unique
-	private boolean isekai$prevHatVisible = true;
+	private final boolean[] isekai$prevVisible = new boolean[7];
 
 	@Inject(method = "setupAnim(Lnet/minecraft/client/renderer/entity/state/HumanoidRenderState;)V", at = @At("TAIL"))
 	private void isekai$browsePose(HumanoidRenderState state, CallbackInfo ci) {
-		if (this.isekai$headHidden) {
-			this.head.visible = this.isekai$prevHeadVisible;
-			this.hat.visible = this.isekai$prevHatVisible;
-			this.isekai$headHidden = false;
+		if (this.isekai$hidden) {
+			ModelPart[] parts = isekai$parts();
+			for (int i = 0; i < parts.length; i++) parts[i].visible = this.isekai$prevVisible[i];
+			this.isekai$hidden = false;
 		}
 		if (!(((Object) state) instanceof PoseFlag flag) || !flag.isekai$isLocalBrowsing()) return;
 		float w = PoseState.weight();
@@ -68,18 +75,25 @@ public abstract class HumanoidModelMixin {
 		this.leftArm.xRot = Mth.lerp(w, this.leftArm.xRot, lx);
 		this.leftArm.yRot = Mth.lerp(w, this.leftArm.yRot, ly);
 		this.leftArm.zRot = Mth.lerp(w, this.leftArm.zRot, lz);
-		this.head.xRot = Mth.lerp(w, this.head.xRot, 0.30f);
-		this.head.yRot = Mth.lerp(w, this.head.yRot, 0.30f);
+		this.head.xRot = Mth.lerp(w, this.head.xRot, 0.14f);
+		this.head.yRot = Mth.lerp(w, this.head.yRot, 0.10f);
 		if (!this.head.hasChild("hat")) {
 			this.hat.copyFrom(this.head);
 		}
 
+		// camera passando "por dentro" do personagem (comeco/fim da animacao): esconde o modelo
 		if (CinematicCamera.nearHead()) {
-			this.isekai$prevHeadVisible = this.head.visible;
-			this.isekai$prevHatVisible = this.hat.visible;
-			this.head.visible = false;
-			this.hat.visible = false;
-			this.isekai$headHidden = true;
+			ModelPart[] parts = isekai$parts();
+			for (int i = 0; i < parts.length; i++) {
+				this.isekai$prevVisible[i] = parts[i].visible;
+				parts[i].visible = false;
+			}
+			this.isekai$hidden = true;
 		}
+	}
+
+	@Unique
+	private ModelPart[] isekai$parts() {
+		return new ModelPart[]{this.head, this.hat, this.body, this.rightArm, this.leftArm, this.rightLeg, this.leftLeg};
 	}
 }
