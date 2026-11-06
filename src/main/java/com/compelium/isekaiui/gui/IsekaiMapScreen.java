@@ -217,7 +217,7 @@ public class IsekaiMapScreen extends Screen {
 
 		updateHover(mouseX, mouseY);
 		if (chrome > 0.01f) drawChrome(g, r, chrome, mouseX, mouseY, map);
-		if (this.popup != Popup.NONE && this.closeNanos < 0L) drawPopup(g, mouseX, mouseY);
+		if (this.popup != Popup.NONE && this.closeNanos < 0L) drawPopup(g, mouseX, mouseY, partialTick);
 		super.render(g, mouseX, mouseY, partialTick);
 		if (this.closeNanos < 0L && this.popup == Popup.NONE && this.hoveredButton >= 0) {
 			this.setTooltipForNextRenderPass(this.buttons.get(this.hoveredButton).tooltip());
@@ -385,7 +385,8 @@ public class IsekaiMapScreen extends Screen {
 		this.nameBox.setTextColor(Theme.TEXT);
 		this.nameBox.setHint(Component.translatable("isekai_ui.map.waypoint_name_hint"));
 		this.nameBox.setValue(name == null ? "" : name);
-		addRenderableWidget(this.nameBox);
+		// so recebe teclado/mouse por aqui; e desenhado dentro do popup (camada de cima) em drawPopup
+		addWidget(this.nameBox);
 		setFocused(this.nameBox);
 		this.nameBox.setFocused(true);
 	}
@@ -455,10 +456,12 @@ public class IsekaiMapScreen extends Screen {
 		Draw.textCentered(g, this.font, label, r.cx(), r.y() + 3, hover ? Theme.TEXT_INK : Theme.TEXT, false);
 	}
 
-	private void drawPopup(GuiGraphics g, int mx, int my) {
+	private void drawPopup(GuiGraphics g, int mx, int my, float partialTick) {
 		Rect pr = this.popupRect;
 		if (pr == null) return;
 		Draw.push(g);
+		// camada acima do mapa: textos do mapa (nomes de reinos) ficam um pouco "a frente" e vazariam pelo popup
+		Draw.layer(g, 100f);
 		// o vidro das janelas e translucido: um fundo quase opaco evita que o mapa apareca atraves do popup
 		Draw.fill(g, pr.x() + 2, pr.y() + 2, pr.right() - 2, pr.bottom() - 2, IsekaiMenuScreen.OVERLAY_BACKDROP);
 		if (this.popup == Popup.CONTEXT) {
@@ -474,6 +477,7 @@ public class IsekaiMapScreen extends Screen {
 			Rect field = new Rect(pr.x() + 8, pr.y() + 8, pr.w() - 16, 16);
 			Draw.fill(g, field.x(), field.y(), field.right(), field.bottom(), 0xC00A080E);
 			Draw.fill(g, field.x(), field.bottom() - 1, field.right(), field.bottom(), Draw.alpha(Theme.GOLD, 0.8f));
+			if (this.nameBox != null) this.nameBox.render(g, mx, my, partialTick);
 			List<MapIcons.Icon> icons = waypointIcons();
 			int gy = pr.y() + 8 + 16 + 6;
 			for (int i = 0; i < icons.size(); i++) {
