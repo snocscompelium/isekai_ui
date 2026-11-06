@@ -257,7 +257,8 @@ public class IsekaiCreativeScreen extends IsekaiMenuScreen<InventoryMenu> {
 		buildButtons();
 		this.layout = compute(this.width, this.height, this.buttons.size());
 		Layout L = this.layout;
-		this.equip = addPanel("equip", 0.05f, -26, 0, true, this.player.getName(), L.equip());
+		// sem aba de titulo: a janela do equipamento e estreita e o nome do jogador ficaria por baixo da biblioteca
+		this.equip = addPanel("equip", 0.05f, -26, 0, true, null, L.equip());
 		this.library = addPanel("catalog", 0f, 0, -20, true, modeName(personalMode), L.library());
 		this.library.drawTitle = false;
 		this.mini = addPanel("minimap", 0.09f, 24, 0, false, IsekaiInventoryScreen.regionName(this.minecraft, this.player), L.mini());
