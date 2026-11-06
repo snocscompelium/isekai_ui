@@ -1,70 +1,63 @@
 package com.compelium.isekaiui.gui;
 
 import com.compelium.isekaiui.anim.Ease;
-import com.compelium.isekaiui.camera.PoseState;
 import com.compelium.isekaiui.client.IsekaiKeys;
 import com.compelium.isekaiui.client.UiSounds;
+import com.compelium.isekaiui.commands.CommandMemory;
 import com.compelium.isekaiui.config.IsekaiConfig;
 import com.compelium.isekaiui.lands.LandsTracker;
 import com.compelium.isekaiui.map.MapManager;
 import com.compelium.isekaiui.map.MapRenderer;
 import com.compelium.isekaiui.map.MapView;
-import com.compelium.isekaiui.mixin.SlotAccessor;
 import net.minecraft.Util;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
+import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.InventoryMenu;
-import net.minecraft.world.inventory.Slot;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Inventario estilo "janela de status" de isekai. Usa o mesmo InventoryMenu do vanilla:
  * os slots so mudam de lugar na tela, entao o servidor continua recebendo cliques normais.
+ * Todas as janelas podem ser arrastadas pelo titulo ou pelas bordas.
  */
-public class IsekaiInventoryScreen extends AbstractContainerScreen<InventoryMenu> {
-	private static final float GROUP_SECONDS = 0.34f;
-	private static final float CLOSE_SECONDS = 0.18f;
+public class IsekaiInventoryScreen extends IsekaiMenuScreen<InventoryMenu> {
 	private static final float TO_MAP_SECONDS = 0.14f;
+	private static final int ROW_H = 16;
+	private static final int MAX_ROWS = 7;
+	private static final int COMMANDS_W = 176;
 	private static boolean vanillaBypass;
-	/** So para testes automaticos: esconde as janelas para fotografar o personagem. */
-	public static boolean debugHidePanels;
+	private static boolean commandsOpen;
 
-	private final Player owner;
-	private final int[] originalX;
-	private final int[] originalY;
 	private final List<BarButton> buttons = new ArrayList<>();
 	private final MapView miniView = new MapView();
-
 	private InventoryLayout layout;
-	private long openNanos;
-	private long closeNanos = -1L;
-	private boolean closingToMap;
-	private Runnable afterClose;
+	private Panel equip;
+	private Panel main;
+	private Panel mini;
+	private Panel craft;
+	private Panel bar;
+	private Panel commands;
 	private int hoveredButton = -1;
 	private boolean miniHovered;
-	private boolean restored;
+	private int commandsScroll;
+	private int hoveredRow = -1;
+	private int hoveredPart;
+	/** Momento (segundos desde que a tela abriu) em que a lista de comandos foi aberta, para animar a entrada. */
+	private float commandsAppearAt;
 
 	private record BarButton(String icon, Component tooltip, Runnable action, boolean on) {
 	}
 
 	public IsekaiInventoryScreen(Player player) {
 		super(player.inventoryMenu, player.getInventory(), Component.translatable("isekai_ui.inventory.title"));
-		this.owner = player;
-		int n = this.menu.slots.size();
-		this.originalX = new int[n];
-		this.originalY = new int[n];
-		for (int i = 0; i < n; i++) {
-			Slot s = this.menu.slots.get(i);
-			this.originalX[i] = s.x;
-			this.originalY[i] = s.y;
-		}
 	}
 
 	/** Usado quando a tela e pequena demais: deixa o inventario vanilla abrir uma vez. */
@@ -74,117 +67,134 @@ public class IsekaiInventoryScreen extends AbstractContainerScreen<InventoryMenu
 		return b;
 	}
 
-	public static int buttonCount() {
-		return 2 + IsekaiConfig.get().menuButtons.size();
-	}
-
-	public boolean wantsCinematicCamera() {
-		return IsekaiConfig.get().thirdPersonCamera && this.closeNanos < 0L;
-	}
-
-	// ------------------------------------------------------------------ ciclo de vida
+	// ------------------------------------------------------------------ janelas
 
 	@Override
-	protected void init() {
-		if (!InventoryLayout.fits(this.width, this.height) || this.menu.slots.size() < 46) {
-			vanillaBypass = true;
-			this.minecraft.setScreen(new InventoryScreen(this.owner));
-			return;
-		}
-		this.imageWidth = this.width;
-		this.imageHeight = this.height;
-		super.init();
-		this.leftPos = 0;
-		this.topPos = 0;
-		if (this.openNanos == 0L) {
-			this.openNanos = System.nanoTime();
-			UiSounds.windowOpen();
-		}
+	protected String layoutKey() {
+		return "inventory";
+	}
+
+	@Override
+	protected boolean screenFits() {
+		return super.screenFits() && this.menu.slots.size() >= 46;
+	}
+
+	@Override
+	protected void openVanillaFallback() {
+		vanillaBypass = true;
+		this.minecraft.setScreen(new InventoryScreen(this.owner));
+	}
+
+	@Override
+	protected void createPanels() {
 		buildButtons();
 		this.layout = InventoryLayout.compute(this.width, this.height, this.buttons.size());
-		placeSlots();
+		InventoryLayout L = this.layout;
+		this.equip = addPanel("equip", 0.05f, -26, 0, true, this.owner.getName(), L.equip);
+		this.main = addPanel("main", 0f, 28, 0, true, Component.translatable("isekai_ui.panel.inventory"), L.main);
+		this.craft = addPanel("craft", 0.13f, 0, 18, true, Component.translatable("isekai_ui.panel.crafting"), L.craft);
+		this.mini = addPanel("minimap", 0.09f, 0, -18, false, regionName(), L.mini.grow(5));
+		this.bar = addPanel("bar", 0.17f, 0, 16, false, null, L.bar);
+		int rows = Math.max(1, Math.min(MAX_ROWS, CommandMemory.entries().size()));
+		int h = 8 + rows * ROW_H + 8;
+		Rect cmdDef = new Rect(L.bar.cx() - COMMANDS_W / 2, L.bar.y() - 10 - h, COMMANDS_W, h);
+		this.commands = addPanel("commands", this.commandsAppearAt, 0, 10, true, Component.translatable("isekai_ui.panel.commands"), cmdDef);
+		this.commands.overlay = true;
+		this.commands.visible = commandsOpen;
 	}
 
 	private void buildButtons() {
 		this.buttons.clear();
 		IsekaiConfig cfg = IsekaiConfig.get();
-		this.buttons.add(new BarButton("map",
-				Component.translatable("isekai_ui.button.map", IsekaiKeys.mapKeyName()), this::openMap, false));
+		this.buttons.add(new BarButton("map", Component.translatable("isekai_ui.button.map", IsekaiKeys.mapKeyName()), this::openMap, false));
 		boolean third = cfg.thirdPersonCamera;
 		this.buttons.add(new BarButton(third ? "camera_third" : "camera_first",
 				Component.translatable(third ? "isekai_ui.button.camera.third" : "isekai_ui.button.camera.first"),
 				this::toggleCamera, third));
+		this.buttons.add(new BarButton("list", Component.translatable("isekai_ui.button.commands"), this::toggleCommands, commandsOpen));
+		for (CommandMemory.Entry e : CommandMemory.pinned()) {
+			this.buttons.add(new BarButton(e.icon, Component.literal(e.label + "  (/" + e.command + ")"), () -> CommandMemory.run(e), false));
+		}
 		for (IsekaiConfig.MenuButton b : cfg.menuButtons) {
 			if (b == null || b.command == null || b.command.isBlank()) continue;
-			String cmd = b.command.strip();
+			String cmd = b.command.strip().startsWith("/") ? b.command.strip().substring(1) : b.command.strip();
 			String label = b.label == null || b.label.isBlank() ? "/" + cmd : b.label;
-			this.buttons.add(new BarButton(b.icon == null ? "star" : b.icon, Component.literal(label), () -> runCommand(cmd), false));
+			this.buttons.add(new BarButton(b.icon == null ? "star" : b.icon, Component.literal(label), () -> {
+				if (this.minecraft.player != null) this.minecraft.player.connection.sendCommand(cmd);
+			}, false));
 		}
 	}
 
 	@Override
-	protected void containerTick() {
-		super.containerTick();
-		if (this.closeNanos >= 0L && secondsSince(this.closeNanos) > closeDuration() + 0.25f) {
-			finishClose();
+	protected void placeSlots() {
+		InventoryLayout L = this.layout;
+		if (L == null) return;
+		int mdx = this.main.dx(), mdy = this.main.dy();
+		placeGrid(9, 27, 9, L.storageX + mdx, L.storageY + mdy);
+		placeHexHotbar(36, L.hotbarX + mdx, L.hotbarY + mdy);
+		int edx = this.equip.dx(), edy = this.equip.dy();
+		for (int a = 0; a < 4; a++) setSlot(5 + a, L.equipX + 4 + edx, L.equipY + a * 22 + 2 + edy);
+		setSlot(45, L.equipX + 4 + edx, L.offhandY + 2 + edy);
+		int cdx = this.craft.dx(), cdy = this.craft.dy();
+		for (int c = 0; c < 4; c++) {
+			setSlot(1 + c, L.craftX + (c % 2) * InventoryLayout.SLOT + cdx, L.craftY + (c / 2) * InventoryLayout.SLOT + cdy);
 		}
+		setSlot(0, L.resultX + cdx, L.resultY + cdy);
 	}
 
-	@Override
-	public void removed() {
-		restoreSlots();
-		super.removed();
-	}
-
-	@Override
-	public boolean isPauseScreen() {
-		return false;
-	}
-
-	@Override
-	public void onClose() {
-		if (this.closeNanos >= 0L) return;
-		if (!IsekaiConfig.get().animations) {
-			super.onClose();
-			return;
+	/** Quantos botoes a barra vai ter (fixos + comandos com pin + botoes do arquivo de configuracao). */
+	private static int expectedButtonCount() {
+		int n = 3 + CommandMemory.pinned().size();
+		for (IsekaiConfig.MenuButton b : IsekaiConfig.get().menuButtons) {
+			if (b != null && b.command != null && !b.command.isBlank()) n++;
 		}
-		startClosing(false, null);
-		UiSounds.windowClose();
+		return n;
 	}
 
-	private void startClosing(boolean toMap, Runnable after) {
-		this.closeNanos = System.nanoTime();
-		this.closingToMap = toMap;
-		this.afterClose = after;
+	/** Onde o minimapa fica na tela (respeitando o layout salvo) — usado pelo mapa para voltar. */
+	public static Rect minimapRect(int width, int height) {
+		InventoryLayout L = InventoryLayout.compute(width, height, expectedButtonCount());
+		Rect def = L.mini.grow(5);
+		Map<String, float[]> saved = IsekaiConfig.get().layouts.get("inventory");
+		float[] f = saved == null ? null : saved.get("minimap");
+		if (f == null || f.length != 2) return L.mini;
+		int top = InventoryLayout.TAB + 1;
+		int x = Mth.clamp(Math.round(f[0] * Math.max(0, width - def.w())), 1, Math.max(1, width - def.w() - 1));
+		int y = Mth.clamp(Math.round(f[1] * Math.max(0, height - def.h())), top, Math.max(top, height - def.h() - 1));
+		return new Rect(x + 5, y + 5, L.mini.w(), L.mini.h());
 	}
 
-	private float closeDuration() {
-		return this.closingToMap ? TO_MAP_SECONDS : CLOSE_SECONDS;
+	// ------------------------------------------------------------------ testes automaticos
+
+	/** Retangulo de um botao da barra (pelo nome do icone), ou null. */
+	public Rect debugButtonRect(String icon) {
+		for (int i = 0; i < this.buttons.size(); i++) {
+			if (this.buttons.get(i).icon().equals(icon)) return buttonRect(this.bar.now, i);
+		}
+		return null;
 	}
 
-	private void finishClose() {
-		Runnable after = this.afterClose;
-		this.afterClose = null;
-		if (this.minecraft == null || this.minecraft.screen != this) return;
-		if (after != null) after.run();
-		else super.onClose();
+	/** Retangulo do alfinete (pin) de uma linha da lista de comandos. */
+	public Rect debugCommandPinRect(int row) {
+		Rect r = rowRect(this.commands, row);
+		return new Rect(r.right() - 30, r.y() + 2, 12, 12);
+	}
+
+	public int debugButtonCount() {
+		return this.buttons.size();
 	}
 
 	// ------------------------------------------------------------------ acoes
 
 	private void openMap() {
-		if (this.closeNanos >= 0L) return;
-		Rect from = this.layout.mini;
+		if (isClosing()) return;
+		Rect from = this.mini.now.grow(-5);
 		UiSounds.mapOpen();
 		Runnable go = () -> {
 			if (this.minecraft.player != null) this.minecraft.player.closeContainer();
 			this.minecraft.setScreen(IsekaiMapScreen.fromInventory(from));
 		};
-		if (!IsekaiConfig.get().animations) {
-			go.run();
-			return;
-		}
-		startClosing(true, go);
+		startClosing(TO_MAP_SECONDS, this.mini, go);
 	}
 
 	private void toggleCamera() {
@@ -195,257 +205,161 @@ public class IsekaiInventoryScreen extends AbstractContainerScreen<InventoryMenu
 		buildButtons();
 	}
 
-	private void runCommand(String command) {
-		if (this.minecraft.player == null) return;
-		String cmd = command.startsWith("/") ? command.substring(1) : command;
-		this.minecraft.player.connection.sendCommand(cmd);
-	}
-
-	// ------------------------------------------------------------------ animacao
-
-	private static float secondsSince(long nanos) {
-		return (System.nanoTime() - nanos) / 1.0e9f;
-	}
-
-	/** 0 = fora da tela, 1 = no lugar. */
-	private float group(float delay, boolean isMini) {
-		if (!IsekaiConfig.get().animations) return this.closeNanos >= 0L ? 0f : 1f;
-		float p = Ease.window(secondsSince(this.openNanos), delay, GROUP_SECONDS);
-		if (this.closeNanos >= 0L) {
-			if (this.closingToMap && isMini) return p;
-			float c = 1f - Ease.window(secondsSince(this.closeNanos), 0f, closeDuration());
-			p = Math.min(p, c);
-		}
-		return p;
-	}
-
-	private static int slide(float p, int distance) {
-		return Math.round((1f - Ease.outBack(p)) * distance);
-	}
-
-	private static float fade(float p) {
-		return Ease.outCubic(Math.min(1f, p * 1.7f));
-	}
-
-	private float pEquip() {
-		return group(0.05f, false);
-	}
-
-	private float pMain() {
-		return group(0f, false);
-	}
-
-	private float pMini() {
-		return group(0.09f, true);
-	}
-
-	private float pCraft() {
-		return group(0.13f, false);
-	}
-
-	private float pBar() {
-		return group(0.17f, false);
-	}
-
-	private Rect equipNow() {
-		return this.layout.equip.offset(slide(pEquip(), -26), 0);
-	}
-
-	private Rect mainNow() {
-		return this.layout.main.offset(slide(pMain(), 28), 0);
-	}
-
-	private Rect miniNow() {
-		return this.layout.mini.offset(0, slide(pMini(), -18));
-	}
-
-	private Rect craftNow() {
-		return this.layout.craft.offset(0, slide(pCraft(), 18));
-	}
-
-	private Rect barNow() {
-		return this.layout.bar.offset(0, slide(pBar(), 16));
-	}
-
-	// ------------------------------------------------------------------ slots
-
-	private void placeSlots() {
-		if (this.layout == null) return;
-		InventoryLayout L = this.layout;
-		int mdx = mainNow().x() - L.main.x();
-		int edx = equipNow().x() - L.equip.x();
-		int cdy = craftNow().y() - L.craft.y();
-		for (int i = 9; i < 36; i++) {
-			int idx = i - 9;
-			set(i, L.storageX + (idx % 9) * InventoryLayout.SLOT + mdx, L.storageY + (idx / 9) * InventoryLayout.SLOT);
-		}
-		for (int k = 0; k < 9; k++) {
-			set(36 + k, L.hotbarX + k * 18 + 4 + mdx, L.hotbarY + ((k & 1) == 1 ? 10 : 0) + 2);
-		}
-		for (int a = 0; a < 4; a++) {
-			set(5 + a, L.equipX + 4 + edx, L.equipY + a * 22 + 2);
-		}
-		set(45, L.equipX + 4 + edx, L.offhandY + 2);
-		for (int c = 0; c < 4; c++) {
-			set(1 + c, L.craftX + (c % 2) * InventoryLayout.SLOT, L.craftY + (c / 2) * InventoryLayout.SLOT + cdy);
-		}
-		set(0, L.resultX, L.resultY + cdy);
-		this.restored = false;
-	}
-
-	private void set(int index, int x, int y) {
-		Slot s = this.menu.slots.get(index);
-		((SlotAccessor) s).isekai$setX(x);
-		((SlotAccessor) s).isekai$setY(y);
-	}
-
-	private void restoreSlots() {
-		if (this.restored) return;
-		int n = Math.min(this.originalX.length, this.menu.slots.size());
-		for (int i = 0; i < n; i++) set(i, this.originalX[i], this.originalY[i]);
-		this.restored = true;
+	private void toggleCommands() {
+		commandsOpen = !commandsOpen;
+		this.commandsScroll = 0;
+		this.commandsAppearAt = time();
+		UiSounds.toggle();
+		this.rebuildWidgets();
 	}
 
 	// ------------------------------------------------------------------ desenho
 
 	@Override
-	public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
-		if (this.layout == null || debugHidePanels) return;
-		if (this.closeNanos >= 0L && secondsSince(this.closeNanos) >= closeDuration()) {
-			finishClose();
+	protected void drawPanel(GuiGraphics g, Panel p, float partialTick, int mouseX, int mouseY) {
+		InventoryLayout L = this.layout;
+		float a = p.alpha;
+		if (p == this.equip) {
+			int dx = p.dx(), dy = p.dy();
+			for (int i = 0; i < 4; i++) {
+				Draw.sprite(g, Theme.SLOT_HEX, L.equipX + dx, L.equipY + i * 22 + dy, InventoryLayout.HEX_W, InventoryLayout.HEX_H, a);
+			}
+			Panels.ornament(g, p.now.x() + 4, L.offhandY - 9 + dy, p.now.w() - 8, a * 0.9f);
+			Draw.sprite(g, Theme.SLOT_HEX, L.equipX + dx, L.offhandY + dy, InventoryLayout.HEX_W, InventoryLayout.HEX_H, a);
+		} else if (p == this.main) {
+			int dx = p.dx(), dy = p.dy();
+			drawGrid(g, L.storageX + dx, L.storageY + dy, 27, 9, a);
+			Panels.ornament(g, p.now.x() + 24, L.hotbarY - 7 + dy, p.now.w() - 48, a * 0.9f);
+			drawHexHotbar(g, L.hotbarX + dx, L.hotbarY + dy, a);
+		} else if (p == this.craft) {
+			int dx = p.dx(), dy = p.dy();
+			drawGrid(g, L.craftX + dx, L.craftY + dy, 4, 2, a);
+			Draw.sprite(g, Theme.CRAFT_ARROW, L.craftX + 37 + dx, L.craftY + 13 + dy, 12, 9, a);
+			Draw.sprite(g, Theme.SLOT_RESULT, L.resultX - 5 + dx, L.resultY - 5 + dy, 26, 26, a);
+			if (!this.menu.slots.get(0).getItem().isEmpty()) {
+				float glow = 0.45f + 0.35f * Mth.sin(time() * 4f);
+				Draw.sprite(g, Theme.SLOT_RESULT_GLOW, L.resultX - 5 + dx, L.resultY - 5 + dy, 26, 26, a * glow);
+			}
+		} else if (p == this.mini) {
+			drawMinimap(g, p, partialTick, mouseX, mouseY);
+		} else if (p == this.bar) {
+			drawBar(g, p, mouseX, mouseY);
+		} else if (p == this.commands) {
+			drawCommands(g, p, mouseX, mouseY);
+		}
+	}
+
+	private void drawMinimap(GuiGraphics g, Panel p, float partialTick, int mouseX, int mouseY) {
+		float a = p.alpha;
+		Rect map = p.now.grow(-5);
+		Player pl = this.owner;
+		this.miniView.cx = Mth.lerp(partialTick, pl.xo, pl.getX());
+		this.miniView.cz = Mth.lerp(partialTick, pl.zo, pl.getZ());
+		this.miniView.zoom = IsekaiConfig.get().map.minimapZoom;
+		Draw.fill(g, map.x() - 2, map.y() + 3, map.right() + 6, map.bottom() + 9, Draw.alpha(Theme.SHADOW, a));
+		MapRenderer.draw(g, MapManager.current(), this.miniView, map, a, partialTick, true);
+		Draw.sprite(g, Theme.MAP_FRAME, p.now.x(), p.now.y(), p.now.w(), p.now.h(), a);
+		boolean hover = !isClosing() && !isDragging() && p.now.contains(mouseX, mouseY) && overlayAt(mouseX, mouseY) == null;
+		if (hover && !this.miniHovered) UiSounds.hover();
+		this.miniHovered = hover;
+		if (hover) {
+			float pulse = 0.6f + 0.4f * Mth.sin(time() * 5f);
+			Draw.sprite(g, Theme.MAP_FRAME_GLOW, p.now.x(), p.now.y(), p.now.w(), p.now.h(), a * pulse);
+		}
+		Component region = regionName();
+		p.title = region;
+		Panels.tab(g, this.font, p.now.x() + 4, p.now.y() - InventoryLayout.TAB, p.now.w() - 8, region, a);
+		BlockPos bp = pl.blockPosition();
+		Component coords = Component.literal("X " + bp.getX() + "   Y " + bp.getY() + "   Z " + bp.getZ());
+		Draw.textCentered(g, this.font, coords, p.now.cx(), p.now.bottom() + 3, Draw.alpha(Theme.TEXT_DIM, a), true);
+	}
+
+	private Rect buttonRect(Rect barRect, int i) {
+		return new Rect(barRect.x() + i * InventoryLayout.BUTTON_STEP, barRect.y() + 1, InventoryLayout.HEX_W, InventoryLayout.HEX_H);
+	}
+
+	private void drawBar(GuiGraphics g, Panel p, int mouseX, int mouseY) {
+		int before = this.hoveredButton;
+		this.hoveredButton = -1;
+		boolean canHover = !isClosing() && !isDragging() && overlayAt(mouseX, mouseY) == null;
+		for (int i = 0; i < this.buttons.size(); i++) {
+			float pi = Ease.clamp01(p.progress * 1.4f - i * 0.12f);
+			Rect b = buttonRect(p.now, i).offset(0, slide(pi, 10));
+			boolean hover = canHover && buttonRect(p.now, i).contains(mouseX, mouseY);
+			if (hover) this.hoveredButton = i;
+			BarButton bb = this.buttons.get(i);
+			Panels.hexButton(g, b, bb.icon(), hover, bb.on(), fade(pi) * (p.alpha > 0 ? 1f : 0f));
+		}
+		if (this.hoveredButton >= 0 && this.hoveredButton != before) UiSounds.hover();
+	}
+
+	private Rect rowRect(Panel p, int row) {
+		return new Rect(p.now.x() + 6, p.now.y() + 8 + row * ROW_H, p.now.w() - 12, ROW_H);
+	}
+
+	private void drawCommands(GuiGraphics g, Panel p, int mouseX, int mouseY) {
+		float a = p.alpha;
+		List<CommandMemory.Entry> list = CommandMemory.entries();
+		this.hoveredRow = -1;
+		this.hoveredPart = 0;
+		if (list.isEmpty()) {
+			List<FormattedCharSequence> lines = this.font.split(Component.translatable("isekai_ui.commands.empty"), p.now.w() - 16);
+			int y = p.now.y() + 9;
+			for (FormattedCharSequence line : lines) {
+				if (y > p.now.bottom() - 9) break;
+				g.drawString(this.font, line, p.now.x() + 8, y, Draw.alpha(Theme.TEXT_DIM, a), false);
+				y += 10;
+			}
 			return;
 		}
-		placeSlots();
-		updateHover(mouseX, mouseY);
-		super.render(g, mouseX, mouseY, partialTick);
-		if (this.closeNanos < 0L) {
-			if (this.hoveredButton >= 0) {
-				this.setTooltipForNextRenderPass(this.buttons.get(this.hoveredButton).tooltip());
-			} else if (this.miniHovered) {
-				this.setTooltipForNextRenderPass(Component.translatable("isekai_ui.map.open_hint", IsekaiKeys.mapKeyName()));
+		this.commandsScroll = Mth.clamp(this.commandsScroll, 0, Math.max(0, list.size() - MAX_ROWS));
+		boolean canHover = !isClosing() && !isDragging();
+		for (int row = 0; row < MAX_ROWS; row++) {
+			int idx = row + this.commandsScroll;
+			if (idx >= list.size()) break;
+			CommandMemory.Entry e = list.get(idx);
+			Rect r = rowRect(p, row);
+			boolean hover = canHover && r.contains(mouseX, mouseY);
+			Rect pin = new Rect(r.right() - 30, r.y() + 2, 12, 12);
+			Rect del = new Rect(r.right() - 14, r.y() + 2, 12, 12);
+			if (hover) {
+				this.hoveredRow = idx;
+				this.hoveredPart = pin.contains(mouseX, mouseY) ? 1 : (del.contains(mouseX, mouseY) ? 2 : 0);
+				Draw.fill(g, r.x(), r.y(), r.right(), r.bottom(), Draw.alpha(0x30FFF2CF, a));
 			}
-			this.renderTooltip(g, mouseX, mouseY);
+			Draw.sprite(g, Theme.icon(e.icon), r.x() + 2, r.y() + 2, 12, 12, Draw.alpha(Theme.IVORY, a));
+			Component label = Component.literal(e.label);
+			String text = this.font.plainSubstrByWidth(label.getString(), r.w() - 54);
+			Draw.text(g, this.font, Component.literal(text), r.x() + 18, r.y() + 4, Draw.alpha(e.pinned ? Theme.TEXT_GOLD : Theme.TEXT, a), false);
+			int pinColor = e.pinned ? 0xFFF2C76A : (hover && this.hoveredPart == 1 ? Theme.IVORY : 0xFF7E7566);
+			Draw.sprite(g, Theme.icon("pin"), pin.x(), pin.y(), 12, 12, Draw.alpha(pinColor, a));
+			int delColor = hover && this.hoveredPart == 2 ? 0xFFE0465E : 0xFF7E7566;
+			Draw.sprite(g, Theme.icon("close"), del.x(), del.y(), 12, 12, Draw.alpha(delColor, a));
 		}
-	}
-
-	private void updateHover(int mx, int my) {
-		int before = this.hoveredButton;
-		boolean miniBefore = this.miniHovered;
-		this.hoveredButton = -1;
-		this.miniHovered = false;
-		if (this.closeNanos >= 0L) return;
-		Rect bar = barNow();
-		for (int i = 0; i < this.buttons.size(); i++) {
-			if (buttonRect(bar, i).contains(mx, my)) this.hoveredButton = i;
+		if (list.size() > MAX_ROWS) {
+			int total = list.size();
+			int trackH = p.now.h() - 16;
+			int barH = Math.max(8, trackH * MAX_ROWS / total);
+			int barY = p.now.y() + 8 + (trackH - barH) * this.commandsScroll / Math.max(1, total - MAX_ROWS);
+			Draw.fill(g, p.now.right() - 4, barY, p.now.right() - 2, barY + barH, Draw.alpha(Theme.GOLD, a * 0.8f));
 		}
-		this.miniHovered = miniNow().grow(4).contains(mx, my);
-		if ((this.hoveredButton >= 0 && this.hoveredButton != before) || (this.miniHovered && !miniBefore)) {
-			UiSounds.hover();
-		}
-	}
-
-	private static Rect buttonRect(Rect bar, int i) {
-		return new Rect(bar.x() + i * InventoryLayout.BUTTON_STEP, bar.y() + 1, InventoryLayout.HEX_W, InventoryLayout.HEX_H);
 	}
 
 	@Override
-	public void renderBackground(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
-		// sem desfoque e sem escurecer: o mundo e o personagem ficam visiveis atras das janelas
-		this.renderBg(g, partialTick, mouseX, mouseY);
-	}
-
-	@Override
-	protected void renderLabels(GuiGraphics g, int mouseX, int mouseY) {
-	}
-
-	@Override
-	protected void renderBg(GuiGraphics g, float partialTick, int mouseX, int mouseY) {
-		InventoryLayout L = this.layout;
-		float time = secondsSince(this.openNanos);
-
-		// ---- equipamento (com o nome do personagem)
-		float pe = pEquip();
-		float ae = fade(pe);
-		Rect er = equipNow();
-		int edx = er.x() - L.equip.x();
-		Panels.panel(g, this.font, er, ae, pe, this.owner.getName(), time);
-		for (int a = 0; a < 4; a++) {
-			Draw.sprite(g, Theme.SLOT_HEX, L.equipX + edx, L.equipY + a * 22, InventoryLayout.HEX_W, InventoryLayout.HEX_H, ae);
-		}
-		Panels.ornament(g, er.x() + 4, L.offhandY - 9, er.w() - 8, ae * 0.9f);
-		Draw.sprite(g, Theme.SLOT_HEX, L.equipX + edx, L.offhandY, InventoryLayout.HEX_W, InventoryLayout.HEX_H, ae);
-
-		// ---- bolsa + atalhos
-		float pm = pMain();
-		float am = fade(pm);
-		Rect mr = mainNow();
-		int mdx = mr.x() - L.main.x();
-		Panels.panel(g, this.font, mr, am, pm, Component.translatable("isekai_ui.panel.inventory"), time);
-		for (int r = 0; r < 3; r++) {
-			for (int c = 0; c < 9; c++) {
-				Draw.sprite(g, Theme.SLOT, L.storageX - 1 + c * InventoryLayout.SLOT + mdx, L.storageY - 1 + r * InventoryLayout.SLOT, 18, 18, am);
+	protected void renderOverlay(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
+		if (isClosing() || isDragging()) return;
+		if (this.hoveredButton >= 0 && this.hoveredButton < this.buttons.size()) {
+			this.setTooltipForNextRenderPass(this.buttons.get(this.hoveredButton).tooltip());
+		} else if (this.miniHovered) {
+			this.setTooltipForNextRenderPass(Component.translatable("isekai_ui.map.open_hint", IsekaiKeys.mapKeyName()));
+		} else if (this.hoveredRow >= 0) {
+			List<CommandMemory.Entry> list = CommandMemory.entries();
+			if (this.hoveredRow < list.size()) {
+				CommandMemory.Entry e = list.get(this.hoveredRow);
+				String key = this.hoveredPart == 1 ? (e.pinned ? "isekai_ui.commands.unpin" : "isekai_ui.commands.pin")
+						: this.hoveredPart == 2 ? "isekai_ui.commands.delete" : "isekai_ui.commands.run";
+				this.setTooltipForNextRenderPass(Component.translatable(key, "/" + e.command));
 			}
-		}
-		Panels.ornament(g, mr.x() + 24, L.hotbarY - 7, mr.w() - 48, am * 0.9f);
-		for (int k = 0; k < 9; k++) {
-			Draw.sprite(g, Theme.SLOT_HEX, L.hotbarX + k * 18 + mdx, L.hotbarY + ((k & 1) == 1 ? 10 : 0),
-					InventoryLayout.HEX_W, InventoryLayout.HEX_H, am);
-		}
-		int selected = this.owner.getInventory().selected;
-		if (selected >= 0 && selected < 9) {
-			int hx = L.hotbarX + selected * 18 + mdx;
-			int hy = L.hotbarY + ((selected & 1) == 1 ? 10 : 0);
-			float pulse = 0.55f + 0.25f * Mth.sin(time * 3.2f);
-			Draw.sprite(g, Theme.SLOT_HEX_SELECTED, hx, hy, InventoryLayout.HEX_W, InventoryLayout.HEX_H, am * pulse);
-		}
-
-		// ---- sintese (crafting 2x2)
-		float pc = pCraft();
-		float ac = fade(pc);
-		Rect cr = craftNow();
-		int cdy = cr.y() - L.craft.y();
-		Panels.panel(g, this.font, cr, ac, pc, Component.translatable("isekai_ui.panel.crafting"), time);
-		for (int c = 0; c < 4; c++) {
-			Draw.sprite(g, Theme.SLOT, L.craftX - 1 + (c % 2) * InventoryLayout.SLOT, L.craftY - 1 + (c / 2) * InventoryLayout.SLOT + cdy, 18, 18, ac);
-		}
-		Draw.sprite(g, Theme.CRAFT_ARROW, L.craftX + 37, L.craftY + 13 + cdy, 12, 9, ac);
-		boolean hasResult = !this.menu.slots.get(0).getItem().isEmpty();
-		Draw.sprite(g, Theme.SLOT_RESULT, L.resultX - 5, L.resultY - 5 + cdy, 26, 26, ac);
-		if (hasResult) {
-			float glow = 0.45f + 0.35f * Mth.sin(time * 4f);
-			Draw.sprite(g, Theme.SLOT_RESULT_GLOW, L.resultX - 5, L.resultY - 5 + cdy, 26, 26, ac * glow);
-		}
-
-		// ---- minimapa
-		float pn = pMini();
-		float an = fade(pn);
-		Rect nr = miniNow();
-		Player p = this.owner;
-		this.miniView.cx = Mth.lerp(partialTick, p.xo, p.getX());
-		this.miniView.cz = Mth.lerp(partialTick, p.zo, p.getZ());
-		this.miniView.zoom = IsekaiConfig.get().map.minimapZoom;
-		Draw.fill(g, nr.x() - 2, nr.y() + 3, nr.right() + 6, nr.bottom() + 9, Draw.alpha(Theme.SHADOW, an));
-		MapRenderer.draw(g, MapManager.current(), this.miniView, nr, an, partialTick, true);
-		Draw.sprite(g, Theme.MAP_FRAME, nr.x() - 5, nr.y() - 5, nr.w() + 10, nr.h() + 10, an);
-		if (this.miniHovered) {
-			float pulse = 0.6f + 0.4f * Mth.sin(time * 5f);
-			Draw.sprite(g, Theme.MAP_FRAME_GLOW, nr.x() - 5, nr.y() - 5, nr.w() + 10, nr.h() + 10, an * pulse);
-		}
-		Panels.tab(g, this.font, nr.x() - 1, nr.y() - 5 - InventoryLayout.TAB, nr.w() + 2, regionName(), an);
-		BlockPos bp = p.blockPosition();
-		Component coords = Component.literal("X " + bp.getX() + "   Y " + bp.getY() + "   Z " + bp.getZ());
-		Draw.textCentered(g, this.font, coords, nr.cx(), nr.bottom() + 8, Draw.alpha(Theme.TEXT_DIM, an), true);
-
-		// ---- barra hexagonal
-		float pb = pBar();
-		Rect br = barNow();
-		for (int i = 0; i < this.buttons.size(); i++) {
-			float pi = Ease.clamp01(pb * 1.4f - i * 0.12f);
-			float ai = fade(pi);
-			Rect b = buttonRect(br, i).offset(0, slide(pi, 10));
-			BarButton bb = this.buttons.get(i);
-			boolean hover = i == this.hoveredButton;
-			Panels.hexButton(g, b, bb.icon(), hover, bb.on(), ai);
 		}
 	}
 
@@ -463,28 +377,65 @@ public class IsekaiInventoryScreen extends AbstractContainerScreen<InventoryMenu
 	// ------------------------------------------------------------------ entrada
 
 	@Override
-	public boolean mouseClicked(double mouseX, double mouseY, int button) {
-		if (this.closeNanos >= 0L) return true;
-		if (button == 0 && miniNow().grow(4).contains(mouseX, mouseY)) {
+	protected boolean onPanelClick(Panel p, double mouseX, double mouseY, int button) {
+		if (p == this.mini && button == 0) {
 			openMap();
 			return true;
 		}
-		Rect bar = barNow();
-		for (int i = 0; i < this.buttons.size(); i++) {
-			if (buttonRect(bar, i).contains(mouseX, mouseY)) {
-				UiSounds.click();
-				this.buttons.get(i).action().run();
+		if (p == this.bar && button == 0) {
+			for (int i = 0; i < this.buttons.size(); i++) {
+				if (buttonRect(p.now, i).contains(mouseX, mouseY)) {
+					UiSounds.click();
+					this.buttons.get(i).action().run();
+					return true;
+				}
+			}
+			return false;
+		}
+		if (p == this.commands) {
+			List<CommandMemory.Entry> list = CommandMemory.entries();
+			for (int row = 0; row < MAX_ROWS; row++) {
+				int idx = row + this.commandsScroll;
+				if (idx >= list.size()) break;
+				Rect r = rowRect(p, row);
+				if (!r.contains(mouseX, mouseY)) continue;
+				CommandMemory.Entry e = list.get(idx);
+				if (button == 1) {
+					CommandMemory.cycleIcon(e);
+					UiSounds.toggle();
+					this.rebuildWidgets();
+					return true;
+				}
+				if (new Rect(r.right() - 30, r.y() + 2, 12, 12).contains(mouseX, mouseY)) {
+					CommandMemory.togglePin(e);
+					UiSounds.toggle();
+					this.rebuildWidgets();
+				} else if (new Rect(r.right() - 14, r.y() + 2, 12, 12).contains(mouseX, mouseY)) {
+					CommandMemory.remove(e);
+					UiSounds.click();
+					this.rebuildWidgets();
+				} else {
+					UiSounds.click();
+					CommandMemory.run(e);
+				}
 				return true;
 			}
 		}
-		boolean handled = super.mouseClicked(mouseX, mouseY, button);
-		if (this.hoveredSlot != null) PoseState.tap();
-		return handled;
+		return false;
+	}
+
+	@Override
+	public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+		if (this.commands != null && this.commands.visible && this.commands.grabArea().contains(mouseX, mouseY)) {
+			this.commandsScroll -= (int) Math.signum(scrollY);
+			return true;
+		}
+		return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
 	}
 
 	@Override
 	public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-		if (this.closeNanos >= 0L) return true;
+		if (isClosing()) return true;
 		if (IsekaiKeys.isMapKey(keyCode, scanCode)) {
 			openMap();
 			return true;
@@ -494,18 +445,5 @@ public class IsekaiInventoryScreen extends AbstractContainerScreen<InventoryMenu
 			return true;
 		}
 		return super.keyPressed(keyCode, scanCode, modifiers);
-	}
-
-	@Override
-	protected boolean hasClickedOutside(double mouseX, double mouseY, int left, int top, int button) {
-		if (this.layout == null) return false;
-		InventoryLayout L = this.layout;
-		boolean inside = L.main.grow(2).contains(mouseX, mouseY)
-				|| L.equip.grow(2).contains(mouseX, mouseY)
-				|| L.craft.grow(2).contains(mouseX, mouseY)
-				|| L.mini.grow(6).contains(mouseX, mouseY)
-				|| L.bar.grow(2).contains(mouseX, mouseY)
-				|| new Rect(L.main.x(), L.main.y() - InventoryLayout.TAB, L.main.w(), InventoryLayout.TAB).contains(mouseX, mouseY);
-		return !inside;
 	}
 }

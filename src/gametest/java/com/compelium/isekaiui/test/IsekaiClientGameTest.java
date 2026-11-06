@@ -1,15 +1,30 @@
 package com.compelium.isekaiui.test;
 
-import com.compelium.isekaiui.gui.InventoryLayout;
+import com.compelium.isekaiui.commands.CommandMemory;
+import com.compelium.isekaiui.gui.IsekaiContainerScreen;
 import com.compelium.isekaiui.gui.IsekaiInventoryScreen;
 import com.compelium.isekaiui.gui.IsekaiMapScreen;
+import com.compelium.isekaiui.gui.Rect;
+import com.compelium.isekaiui.map.DimMap;
+import com.compelium.isekaiui.map.Emblems;
+import com.compelium.isekaiui.map.MapManager;
+import com.compelium.isekaiui.map.Waypoints;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.client.gui.screens.inventory.ContainerScreen;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.inventory.ChestMenu;
+import net.minecraft.world.inventory.Slot;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.Vec3;
 import org.lwjgl.glfw.GLFW;
 
 /**
@@ -45,6 +60,11 @@ public class IsekaiClientGameTest implements FabricClientGameTest {
 			server.runCommand("give @a minecraft:potion");
 			server.runCommand("give @a minecraft:map");
 			server.runCommand("give @a minecraft:emerald 12");
+			server.runCommand("give @a minecraft:light_blue_shulker_box[minecraft:container=["
+					+ "{slot:0,item:{id:\"minecraft:diamond\",count:3}},{slot:1,item:{id:\"minecraft:gold_ingot\",count:16}},"
+					+ "{slot:4,item:{id:\"minecraft:ender_pearl\",count:8}},{slot:9,item:{id:\"minecraft:golden_apple\",count:2}},"
+					+ "{slot:13,item:{id:\"minecraft:enchanted_book\",count:1}},{slot:22,item:{id:\"minecraft:cake\",count:1}}]]");
+			server.runCommand("give @a minecraft:bundle[minecraft:bundle_contents=[{id:\"minecraft:arrow\",count:16},{id:\"minecraft:bread\",count:4},{id:\"minecraft:feather\",count:3}]]");
 			server.runCommand("item replace entity @a armor.head with minecraft:iron_helmet");
 			server.runCommand("item replace entity @a armor.chest with minecraft:iron_chestplate");
 			server.runCommand("item replace entity @a armor.legs with minecraft:iron_leggings");
@@ -89,12 +109,41 @@ public class IsekaiClientGameTest implements FabricClientGameTest {
 			});
 			System.out.println("[isekai-test] " + camInfo);
 			ctx.takeScreenshot("isekai-02-inventario");
-			ctx.runOnClient(mc -> IsekaiInventoryScreen.debugHidePanels = true);
+			ctx.runOnClient(mc -> com.compelium.isekaiui.gui.IsekaiMenuScreen.debugHidePanels = true);
 			ctx.waitTicks(4);
 			ctx.takeScreenshot("isekai-02b-so-personagem");
-			ctx.runOnClient(mc -> IsekaiInventoryScreen.debugHidePanels = false);
+			ctx.runOnClient(mc -> com.compelium.isekaiui.gui.IsekaiMenuScreen.debugHidePanels = false);
 			boolean isekai = ctx.computeOnClient(mc -> mc.screen instanceof IsekaiInventoryScreen);
 			if (!isekai) throw new AssertionError("O inventario isekai nao abriu");
+
+			// v0.2: arrastar a janela do inventario pela aba do titulo
+			double scale = ctx.computeOnClient(mc -> mc.getWindow().getGuiScale());
+			Rect before = ctx.computeOnClient(mc -> ((IsekaiInventoryScreen) mc.screen).debugPanelRect("main"));
+			ctx.getInput().setCursorPos((before.x() + 14) * scale, (before.y() - 5) * scale);
+			ctx.waitTicks(2);
+			ctx.getInput().holdMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
+			ctx.waitTicks(1);
+			for (int i = 0; i < 4; i++) {
+				ctx.getInput().moveCursor(18 * scale, 9 * scale);
+				ctx.waitTicks(1);
+			}
+			ctx.takeScreenshot("isekai-02c-arrastando-janela");
+			ctx.getInput().releaseMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
+			ctx.waitTicks(3);
+			ctx.takeScreenshot("isekai-02d-janela-movida");
+			Rect moved = ctx.computeOnClient(mc -> ((IsekaiInventoryScreen) mc.screen).debugPanelRect("main"));
+			System.out.println("[isekai-test] janela antes=" + before + " depois=" + moved);
+			if (moved.x() == before.x() && moved.y() == before.y()) throw new AssertionError("A janela nao foi arrastada");
+			// duplo clique na aba: volta para o lugar padrao
+			ctx.getInput().setCursorPos((moved.x() + 14) * scale, (moved.y() - 5) * scale);
+			ctx.waitTicks(2);
+			ctx.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
+			ctx.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
+			ctx.waitTicks(3);
+			Rect reset = ctx.computeOnClient(mc -> ((IsekaiInventoryScreen) mc.screen).debugPanelRect("main"));
+			if (reset.x() != before.x() || reset.y() != before.y()) {
+				throw new AssertionError("Duplo clique na aba nao devolveu a janela ao lugar padrao: " + reset + " (esperado " + before + ")");
+			}
 
 			double[] mini = ctx.computeOnClient(IsekaiClientGameTest::miniCenter);
 			ctx.getInput().setCursorPos(mini[0], mini[1]);
@@ -137,6 +186,116 @@ public class IsekaiClientGameTest implements FabricClientGameTest {
 			ctx.getInput().pressKey(GLFW.GLFW_KEY_M);
 			ctx.waitTicks(30);
 			ctx.takeScreenshot("isekai-11-mapa-pela-tecla");
+
+			// v0.2: marcadores e simbolo do reino
+			ctx.runOnClient(mc -> {
+				DimMap dim = MapManager.current();
+				int px = mc.player.getBlockX();
+				int py = mc.player.getBlockY();
+				int pz = mc.player.getBlockZ();
+				Waypoints.Waypoint mine = new Waypoints.Waypoint();
+				mine.name = "Mina";
+				mine.x = px + 27;
+				mine.y = py + 4;
+				mine.z = pz + 6;
+				mine.icon = "glyph:pickaxe";
+				mine.color = Waypoints.COLORS[1];
+				dim.waypoints().add(mine);
+				Waypoints.Waypoint far = new Waypoints.Waypoint();
+				far.name = "Torre distante";
+				far.x = px + 900;
+				far.y = py;
+				far.z = pz - 420;
+				far.icon = "glyph:tower";
+				far.color = Waypoints.COLORS[5];
+				dim.waypoints().add(far);
+				((IsekaiMapScreen) mc.screen).debugOpenNewWaypoint(px - 3, pz + 26, "Vila do Teste");
+			});
+			ctx.waitTicks(5);
+			ctx.takeScreenshot("isekai-11b-novo-marcador");
+			ctx.runOnClient(mc -> {
+				((IsekaiMapScreen) mc.screen).debugSaveWaypoint();
+				Emblems.set("Reino de Aurora", "emblem:crown");
+			});
+			ctx.waitTicks(5);
+			ctx.takeScreenshot("isekai-11c-mapa-com-marcadores");
+			int waypointCount = ctx.computeOnClient(mc -> MapManager.current().waypoints().all().size());
+			if (waypointCount != 3) throw new AssertionError("Esperava 3 marcadores, tem " + waypointCount);
+			ctx.runOnClient(mc -> ((IsekaiMapScreen) mc.screen).debugOpenEmblem("Reino de Aurora"));
+			ctx.waitTicks(5);
+			ctx.takeScreenshot("isekai-11d-simbolo-do-reino");
+			ctx.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
+			ctx.waitTicks(3);
+			ctx.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
+			ctx.waitTicks(20);
+
+			// v0.2: bau de verdade (estilo isekai) com uma shulker cheia dentro
+			server.runCommand("execute at @p run setblock ~2 ~ ~ minecraft:chest[facing=west]{Items:["
+					+ "{Slot:0b,id:\"minecraft:diamond\",count:5},{Slot:1b,id:\"minecraft:golden_apple\",count:3},"
+					+ "{Slot:4b,id:\"minecraft:red_shulker_box\",count:1,components:{\"minecraft:container\":["
+					+ "{slot:0,item:{id:\"minecraft:iron_ingot\",count:32}},{slot:2,item:{id:\"minecraft:redstone\",count:20}},"
+					+ "{slot:10,item:{id:\"minecraft:experience_bottle\",count:6}},{slot:26,item:{id:\"minecraft:totem_of_undying\",count:1}}]}},"
+					+ "{Slot:13b,id:\"minecraft:oak_log\",count:32},{Slot:22b,id:\"minecraft:iron_ingot\",count:20}]} replace");
+			// bau com nome (como os menus de plugin): tem que continuar vanilla
+			server.runCommand("execute at @p run setblock ~-2 ~ ~ minecraft:chest[facing=east]{CustomName:'\"Loja do Servidor\"',Items:["
+					+ "{Slot:10b,id:\"minecraft:emerald\",count:1},{Slot:12b,id:\"minecraft:diamond_sword\",count:1},"
+					+ "{Slot:14b,id:\"minecraft:golden_apple\",count:1},{Slot:16b,id:\"minecraft:experience_bottle\",count:1}]} replace");
+			ctx.waitTicks(10);
+			ctx.runOnClient(mc -> useBlock(mc, 2));
+			ctx.waitTicks(40);
+			ctx.takeScreenshot("isekai-13-bau-isekai");
+			boolean chestIsekai = ctx.computeOnClient(mc -> mc.screen instanceof IsekaiContainerScreen);
+			if (!chestIsekai) throw new AssertionError("O bau nao abriu no estilo isekai: " + ctx.computeOnClient(mc -> String.valueOf(mc.screen)));
+			double[] shulkerSlot = ctx.computeOnClient(mc -> slotCenter(mc, 4));
+			ctx.getInput().setCursorPos(shulkerSlot[0], shulkerSlot[1]);
+			ctx.waitTicks(4);
+			ctx.takeScreenshot("isekai-14-bau-shulker-por-dentro");
+			ctx.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
+			ctx.waitTicks(25);
+
+			ctx.runOnClient(mc -> useBlock(mc, -2));
+			ctx.waitTicks(15);
+			ctx.takeScreenshot("isekai-15-menu-de-plugin-intacto");
+			boolean pluginVanilla = ctx.computeOnClient(mc -> mc.screen != null && mc.screen.getClass() == ContainerScreen.class);
+			if (!pluginVanilla) throw new AssertionError("O bau com nome devia continuar vanilla: " + ctx.computeOnClient(mc -> String.valueOf(mc.screen)));
+			ctx.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
+			ctx.waitTicks(50);
+
+			// v0.2: comando que abre menu vira comando rapido
+			ctx.runOnClient(mc -> mc.player.connection.sendCommand("pets"));
+			ctx.waitTicks(5);
+			ctx.runOnClient(mc -> mc.setScreen(new ContainerScreen(ChestMenu.threeRows(91, mc.player.getInventory()),
+					mc.player.getInventory(), Component.literal("Menu de Pets"))));
+			ctx.waitTicks(5);
+			ctx.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
+			ctx.waitTicks(10);
+			boolean learned = ctx.computeOnClient(mc -> CommandMemory.entries().stream().anyMatch(e -> e.command.equals("pets")));
+			if (!learned) throw new AssertionError("O comando /pets nao foi aprendido");
+
+			ctx.getInput().pressKey(options -> options.keyInventory);
+			ctx.waitTicks(40);
+			double[] shulkerInv = ctx.computeOnClient(mc -> slotCenter(mc, 44));
+			ctx.getInput().setCursorPos(shulkerInv[0], shulkerInv[1]);
+			ctx.waitTicks(4);
+			ctx.takeScreenshot("isekai-16-inventario-shulker");
+			double[] bundleInv = ctx.computeOnClient(mc -> slotCenter(mc, 9));
+			ctx.getInput().setCursorPos(bundleInv[0], bundleInv[1]);
+			ctx.waitTicks(4);
+			ctx.takeScreenshot("isekai-17-inventario-sacola");
+			Rect listButton = ctx.computeOnClient(mc -> ((IsekaiInventoryScreen) mc.screen).debugButtonRect("list"));
+			click(ctx, listButton, scale);
+			ctx.waitTicks(15);
+			ctx.takeScreenshot("isekai-18-comandos-rapidos");
+			Rect pin = ctx.computeOnClient(mc -> ((IsekaiInventoryScreen) mc.screen).debugCommandPinRect(0));
+			click(ctx, pin, scale);
+			ctx.waitTicks(15);
+			ctx.takeScreenshot("isekai-19-comando-fixado");
+			int buttons = ctx.computeOnClient(mc -> ((IsekaiInventoryScreen) mc.screen).debugButtonCount());
+			if (buttons != 4) throw new AssertionError("O comando fixado nao apareceu na barra (botoes: " + buttons + ")");
+			// fecha a lista e o inventario
+			Rect listAgain = ctx.computeOnClient(mc -> ((IsekaiInventoryScreen) mc.screen).debugButtonRect("list"));
+			click(ctx, listAgain, scale);
+			ctx.waitTicks(5);
 			ctx.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
 			ctx.waitTicks(20);
 
@@ -149,10 +308,37 @@ public class IsekaiClientGameTest implements FabricClientGameTest {
 			ctx.waitTicks(5);
 			ctx.getInput().pressKey(options -> options.keyInventory);
 			ctx.waitTicks(60);
-			ctx.takeScreenshot("isekai-12-inventario-1080p");
+			ctx.takeScreenshot("isekai-30-inventario-1080p");
+			ctx.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
+			ctx.waitTicks(20);
+			ctx.runOnClient(mc -> useBlock(mc, 2));
+			ctx.waitTicks(40);
+			ctx.takeScreenshot("isekai-31-bau-1080p");
 			ctx.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
 			ctx.waitTicks(20);
 		}
+	}
+
+	/** Clique direito (usar) no bloco a "dx" blocos do jogador no eixo X. */
+	private static void useBlock(Minecraft mc, int dx) {
+		BlockPos pos = BlockPos.containing(mc.player.getX() + dx, mc.player.getY(), mc.player.getZ());
+		Direction face = dx > 0 ? Direction.WEST : Direction.EAST;
+		mc.gameMode.useItemOn(mc.player, InteractionHand.MAIN_HAND, new BlockHitResult(Vec3.atCenterOf(pos), face, pos, false));
+	}
+
+	/** Centro de um slot da tela aberta, em pixels da janela. */
+	private static double[] slotCenter(Minecraft mc, int index) {
+		AbstractContainerScreen<?> screen = (AbstractContainerScreen<?>) mc.screen;
+		Slot slot = screen.getMenu().slots.get(index);
+		double sc = mc.getWindow().getGuiScale();
+		return new double[]{(slot.x + 8) * sc, (slot.y + 8) * sc};
+	}
+
+	private static void click(ClientGameTestContext ctx, Rect r, double scale) {
+		if (r == null) throw new AssertionError("Botao nao encontrado");
+		ctx.getInput().setCursorPos(r.cx() * scale, r.cy() * scale);
+		ctx.waitTicks(2);
+		ctx.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
 	}
 
 	/** Monta um pequeno cenario (morro em degraus, lago, vila, arvores) para o mapa ter o que mostrar. */
@@ -197,10 +383,8 @@ public class IsekaiClientGameTest implements FabricClientGameTest {
 	}
 
 	private static double[] miniCenter(Minecraft mc) {
-		int w = mc.getWindow().getGuiScaledWidth();
-		int h = mc.getWindow().getGuiScaledHeight();
-		InventoryLayout layout = InventoryLayout.compute(w, h, IsekaiInventoryScreen.buttonCount());
+		Rect mini = ((IsekaiInventoryScreen) mc.screen).debugPanelRect("minimap");
 		double scale = mc.getWindow().getGuiScale();
-		return new double[]{layout.mini.cx() * scale, layout.mini.cy() * scale};
+		return new double[]{mini.cx() * scale, mini.cy() * scale};
 	}
 }

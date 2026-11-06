@@ -72,6 +72,7 @@ public final class MapRenderer {
 		if (settings.showGrid && !mini) drawGrid(g, view, r, alpha);
 		if (settings.showClaims) drawClaims(g, map, view, r, alpha, !mini, mc.font);
 		if (settings.showEntities) drawEntities(g, view, r, alpha, partialTick);
+		if (settings.showWaypoints) drawWaypoints(g, map, view, r, alpha, mini, mc.font);
 		drawPlayer(g, view, r, alpha, partialTick);
 		Draw.endScissor(g);
 	}
@@ -126,7 +127,7 @@ public final class MapRenderer {
 		int cxMax = Math.floorDiv((int) Math.floor(toWorldX(v, r, r.right())), 16);
 		int czMin = Math.floorDiv((int) Math.floor(toWorldZ(v, r, r.y())), 16);
 		int czMax = Math.floorDiv((int) Math.floor(toWorldZ(v, r, r.bottom())), 16);
-		Map<String, double[]> centers = labels ? new HashMap<>() : null;
+		Map<String, double[]> centers = new HashMap<>();
 
 		long area = (long) (cxMax - cxMin + 1) * (czMax - czMin + 1);
 		if (area <= 40_000L) {
@@ -145,20 +146,60 @@ public final class MapRenderer {
 			}
 		}
 
-		if (centers != null) {
-			for (Map.Entry<String, double[]> e : centers.entrySet()) {
-				double[] c = e.getValue();
-				double areaPx = c[2] * 256.0 * v.zoom * v.zoom;
-				if (areaPx < 700) continue;
-				int sx = toScreenX(v, r, c[0] / c[2]);
-				int sy = toScreenY(v, r, c[1] / c[2]);
-				Component name = Component.literal(e.getKey());
-				int w = font.width(name);
-				int col = Theme.landColor(e.getKey());
-				Draw.fill(g, sx - w / 2 - 3, sy - 6, sx + w / 2 + 3, sy + 6, Draw.rgb(MapStyle.shade(col, 0.45f), alpha * 0.55f));
-				Draw.textCentered(g, font, name, sx, sy - 4, Draw.alpha(Theme.TEXT, alpha), true);
+		for (Map.Entry<String, double[]> e : centers.entrySet()) {
+			double[] c = e.getValue();
+			double areaPx = c[2] * 256.0 * v.zoom * v.zoom;
+			int sx = toScreenX(v, r, c[0] / c[2]);
+			int sy = toScreenY(v, r, c[1] / c[2]);
+			MapIcons.Icon emblem = MapIcons.find(Emblems.get(e.getKey()));
+			boolean label = labels && areaPx >= 700;
+			if (emblem != null && areaPx >= 90) {
+				int size = labels ? (areaPx >= 2500 ? 22 : 16) : 11;
+				int ey = label ? sy - 7 - size / 2 : sy;
+				emblem.draw(g, sx, ey, size, 0xFFFFFF, alpha);
 			}
+			if (!label) continue;
+			Component name = Component.literal(e.getKey());
+			int w = font.width(name);
+			int col = Theme.landColor(e.getKey());
+			Draw.fill(g, sx - w / 2 - 3, sy - 6, sx + w / 2 + 3, sy + 6, Draw.rgb(MapStyle.shade(col, 0.45f), alpha * 0.55f));
+			Draw.textCentered(g, font, name, sx, sy - 4, Draw.alpha(Theme.TEXT, alpha), true);
 		}
+	}
+
+	/** Marcadores do jogador: icone pequeno com o nome escrito a "tinta" embaixo; fora da area vira um losango na borda. */
+	private static void drawWaypoints(GuiGraphics g, DimMap map, MapView v, Rect r, float alpha, boolean mini, Font font) {
+		java.util.List<Waypoints.Waypoint> list = map.waypoints().all();
+		if (list.isEmpty()) return;
+		Rect inner = r.grow(-4);
+		for (Waypoints.Waypoint w : list) {
+			int sx = toScreenX(v, r, w.x + 0.5);
+			int sy = toScreenY(v, r, w.z + 0.5);
+			if (!inner.contains(sx, sy)) {
+				int ex = Mth.clamp(sx, inner.x() + 2, inner.right() - 3);
+				int ey = Mth.clamp(sy, inner.y() + 2, inner.bottom() - 3);
+				diamond(g, ex, ey, Draw.rgb(w.color, alpha * 0.9f), Draw.rgb(MapStyle.INK, alpha * 0.7f));
+				continue;
+			}
+			MapIcons.Icon icon = MapIcons.get(w.icon);
+			icon.draw(g, sx, sy, mini ? 9 : 12, w.color, alpha);
+			if (mini || w.name == null || w.name.isBlank() || v.zoom < 0.2f) continue;
+			Component name = Component.literal(w.name);
+			Draw.push(g);
+			Draw.translate(g, sx, sy + 7);
+			Draw.scale(g, 0.75f);
+			Draw.textCentered(g, font, name, 0, 0, Draw.alpha(Theme.MAP_INK, alpha), false);
+			Draw.pop(g);
+		}
+	}
+
+	private static void diamond(GuiGraphics g, int cx, int cy, int color, int outline) {
+		Draw.fill(g, cx - 1, cy - 3, cx + 2, cy + 4, outline);
+		Draw.fill(g, cx - 3, cy - 1, cx + 4, cy + 2, outline);
+		Draw.fill(g, cx - 2, cy - 2, cx + 3, cy + 3, outline);
+		Draw.fill(g, cx, cy - 2, cx + 1, cy + 3, color);
+		Draw.fill(g, cx - 2, cy, cx + 3, cy + 1, color);
+		Draw.fill(g, cx - 1, cy - 1, cx + 2, cy + 2, color);
 	}
 
 	private static void drawClaimChunk(GuiGraphics g, DimMap map, MapView v, Rect r, int cx, int cz, String owner,
@@ -174,12 +215,10 @@ public final class MapRenderer {
 		if (!owner.equals(map.claim(cx, cz + 1))) Draw.fill(g, x0, y1 - 1, x1, y1, border);
 		if (!owner.equals(map.claim(cx - 1, cz))) Draw.fill(g, x0, y0, x0 + 1, y1, border);
 		if (!owner.equals(map.claim(cx + 1, cz))) Draw.fill(g, x1 - 1, y0, x1, y1, border);
-		if (centers != null) {
-			double[] c = centers.computeIfAbsent(owner, k -> new double[3]);
-			c[0] += cx * 16.0 + 8.0;
-			c[1] += cz * 16.0 + 8.0;
-			c[2] += 1.0;
-		}
+		double[] c = centers.computeIfAbsent(owner, k -> new double[3]);
+		c[0] += cx * 16.0 + 8.0;
+		c[1] += cz * 16.0 + 8.0;
+		c[2] += 1.0;
 	}
 
 	private static void drawEntities(GuiGraphics g, MapView v, Rect r, float alpha, float partialTick) {

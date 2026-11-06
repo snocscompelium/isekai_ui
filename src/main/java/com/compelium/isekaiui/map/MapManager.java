@@ -62,12 +62,14 @@ public final class MapManager {
 			closeCurrent();
 			return;
 		}
-		String key = serverKey(mc) + "/" + sanitize(level.dimension().location().toString());
+		String server = serverKey(mc);
+		String key = server + "/" + sanitize(level.dimension().location().toString());
 		if (!key.equals(currentKey)) {
 			closeCurrent();
 			current = new DimMap(baseDir().resolve(key));
 			currentKey = key;
 			LandsTracker.reset();
+			Emblems.load(serverDir(server));
 		}
 		ticks++;
 		int pcx = mc.player.chunkPosition().x;
@@ -121,7 +123,12 @@ public final class MapManager {
 		return FabricLoader.getInstance().getGameDir().resolve("isekai_ui").resolve("maps");
 	}
 
-	private static String serverKey(Minecraft mc) {
+	/** Pasta com os dados de um servidor (mapas por dimensao, comandos, simbolos de reino). */
+	public static Path serverDir(String serverKey) {
+		return baseDir().resolve(serverKey);
+	}
+
+	public static String serverKey(Minecraft mc) {
 		ServerData server = mc.getCurrentServer();
 		if (server != null) return "mp_" + sanitize(server.ip);
 		if (mc.getSingleplayerServer() != null) {

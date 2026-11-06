@@ -2,7 +2,7 @@ package com.compelium.isekaiui.camera;
 
 import com.compelium.isekaiui.anim.Ease;
 import com.compelium.isekaiui.config.IsekaiConfig;
-import com.compelium.isekaiui.gui.IsekaiInventoryScreen;
+import com.compelium.isekaiui.gui.IsekaiMenuScreen;
 import net.minecraft.client.CameraType;
 import net.minecraft.client.Minecraft;
 import net.minecraft.util.Mth;
@@ -41,7 +41,7 @@ public final class CinematicCamera {
 		float dt = lastNanos == 0L ? 0f : Math.min(0.5f, (now - lastNanos) / 1.0e9f);
 		lastNanos = now;
 
-		boolean want = mc.player != null && mc.screen instanceof IsekaiInventoryScreen screen && screen.wantsCinematicCamera();
+		boolean want = mc.player != null && mc.screen instanceof IsekaiMenuScreen<?> screen && screen.wantsCinematicCamera();
 		boolean animate = IsekaiConfig.get().animations;
 		if (want) {
 			if (progress <= 0f && mc.player != null) {

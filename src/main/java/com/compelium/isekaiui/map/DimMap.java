@@ -40,6 +40,7 @@ public final class DimMap {
 	private final LongOpenHashSet dirtyRegions = new LongOpenHashSet();
 	private final LongOpenHashSet regionsWithData = new LongOpenHashSet();
 	private final TileCache tiles = new TileCache(this);
+	private final Waypoints waypoints;
 	private boolean claimsDirty;
 	private int claimsVersion;
 
@@ -65,6 +66,18 @@ public final class DimMap {
 			IsekaiUI.LOG.warn("Nao consegui abrir a pasta do mapa {}", dir, e);
 		}
 		loadClaims();
+		this.waypoints = new Waypoints(dir);
+	}
+
+	public Waypoints waypoints() {
+		return this.waypoints;
+	}
+
+	/** Altura do chao conhecida no mapa (ou null se o chunk nunca foi lido). */
+	public Integer surfaceY(int bx, int bz) {
+		ChunkSlice s = chunk(bx >> 4, bz >> 4);
+		if (s == null) return null;
+		return (int) s.height[ChunkSlice.index(bx & 15, bz & 15)];
 	}
 
 	public static long key(int x, int z) {

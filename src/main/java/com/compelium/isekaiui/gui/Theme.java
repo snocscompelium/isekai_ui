@@ -46,7 +46,8 @@ public final class Theme {
 
 	public static final Set<String> ICONS = Set.of(
 			"map", "camera_third", "camera_first", "inventory", "center", "entities", "claims", "grid", "close", "back",
-			"star", "sword", "paw", "scroll", "coin", "house", "book", "gear", "people", "flag", "compass", "potion");
+			"star", "sword", "paw", "scroll", "coin", "house", "book", "gear", "people", "flag", "compass", "potion",
+			"list", "pin", "gem", "skull", "tree", "pickaxe", "anchor", "portal", "tower");
 
 	public static ResourceLocation icon(String name) {
 		return IsekaiUI.id("icon/" + (ICONS.contains(name) ? name : "star"));

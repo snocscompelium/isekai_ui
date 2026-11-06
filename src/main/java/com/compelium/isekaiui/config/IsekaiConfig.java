@@ -11,7 +11,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Configuracao em config/isekai_ui.json. Campos que comecam com "_" sao so explicacoes.
@@ -24,6 +26,10 @@ public final class IsekaiConfig {
 
 	/** Substitui o inventario vanilla (modo sobrevivencia/aventura) pelo inventario isekai. */
 	public boolean enableInventory = true;
+	/** Bau, bau grande, barril, bau do ender e shulker box no estilo isekai (so os com nome padrao do jogo). */
+	public boolean enableContainers = true;
+	/** Mostra os itens de dentro da shulker box ao passar o mouse sobre ela. */
+	public boolean shulkerPreview = true;
 	/** Camera em terceira pessoa ao abrir o inventario (F5 dentro do inventario alterna). */
 	public boolean thirdPersonCamera = true;
 	/** Personagem levanta os bracos "mexendo" na janela. */
@@ -42,6 +48,8 @@ public final class IsekaiConfig {
 	public float uiSoundVolume = 0.7f;
 
 	public MapSettings map = new MapSettings();
+	public String _layoutsInfo = "Posicoes das janelas arrastadas (0 = esquerda/topo, 1 = direita/baixo). Apague para voltar ao padrao.";
+	public Map<String, Map<String, float[]>> layouts = new HashMap<>();
 	public LandsSettings lands = new LandsSettings();
 
 	public String _menuButtonsInfo = "Atalhos de comando na barra hexagonal. Exemplo: {\"label\": \"Habilidades\", \"command\": \"skills\", \"icon\": \"star\"}. Icones: star, sword, paw, scroll, coin, house, book, gear, people, flag, compass, potion";
@@ -53,6 +61,7 @@ public final class IsekaiConfig {
 		public boolean showEntities = true;
 		public boolean showClaims = true;
 		public boolean showGrid = true;
+		public boolean showWaypoints = true;
 		/** Pixels de interface por bloco no minimapa. */
 		public float minimapZoom = 1.0f;
 		/** Pixels de interface por bloco ao abrir o mapa grande. */
@@ -124,6 +133,7 @@ public final class IsekaiConfig {
 		if (map == null) map = new MapSettings();
 		if (lands == null) lands = new LandsSettings();
 		if (menuButtons == null) menuButtons = new ArrayList<>();
+		if (layouts == null) layouts = new HashMap<>();
 		if (lands.wildernessPatterns == null) lands.wildernessPatterns = new ArrayList<>();
 		if (lands.landPattern == null || lands.landPattern.isBlank()) lands.landPattern = "^\\s*(?<land>.+?)\\s*$";
 		if (lands.requiredColor == null) lands.requiredColor = "";

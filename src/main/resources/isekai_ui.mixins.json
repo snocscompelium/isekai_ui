@@ -9,7 +9,9 @@
 		"EntityRenderStateMixin",
 		"GuiMixin",
 		"HumanoidModelMixin",
+		"ItemMixin",
 		"MinecraftMixin",
+		"ShulkerBoxBlockMixin",
 		"SlotAccessor"
 	],
 	"injectors": {

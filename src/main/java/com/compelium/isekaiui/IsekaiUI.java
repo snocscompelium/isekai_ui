@@ -1,9 +1,13 @@
 package com.compelium.isekaiui;
 
 import com.compelium.isekaiui.client.IsekaiKeys;
+import com.compelium.isekaiui.commands.CommandMemory;
 import com.compelium.isekaiui.config.IsekaiConfig;
 import com.compelium.isekaiui.lands.LandsTracker;
 import com.compelium.isekaiui.map.MapManager;
+import com.compelium.isekaiui.tooltip.ClientShulkerPreview;
+import com.compelium.isekaiui.tooltip.ShulkerPreview;
+import net.fabricmc.fabric.api.client.rendering.v1.TooltipComponentCallback;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.minecraft.resources.ResourceLocation;
@@ -29,6 +33,8 @@ public final class IsekaiUI implements ClientModInitializer {
 		IsekaiKeys.register();
 		MapManager.init();
 		LandsTracker.init();
+		CommandMemory.init();
+		TooltipComponentCallback.EVENT.register(data -> data instanceof ShulkerPreview preview ? new ClientShulkerPreview(preview) : null);
 		ClientTickEvents.END_CLIENT_TICK.register(IsekaiKeys::tick);
 		LOG.info("Compelium's Isekai UI pronto.");
 	}

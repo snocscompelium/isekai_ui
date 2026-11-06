@@ -46,10 +46,7 @@ public final class InventoryLayout {
 		int gapMain = 12;
 		int groupW = mainW + gapMain + miniS;
 
-		float charX = W * IsekaiConfig.get().characterScreenX;
-		int mainX = Math.round(charX + 46);
-		mainX = Math.min(mainX, W - 8 - groupW);
-		mainX = Math.max(mainX, 52);
+		int mainX = mainColumnX(W, mainW, groupW);
 
 		int mainColumnH = TAB + mainH + 8 + 22;
 		int mainY = (H - mainColumnH) / 2 + TAB;
@@ -81,6 +78,17 @@ public final class InventoryLayout {
 		this.craftY = craft.y() + 7 + 1;
 		this.resultX = craft.right() - 8 - 26 + 5;
 		this.resultY = craft.y() + 7 + SLOT - 8;
+	}
+
+	/**
+	 * X da janela principal: centralizada na tela quando ha espaco, mas sempre a direita do personagem
+	 * (que fica a esquerda com a camera em 3a pessoa).
+	 */
+	public static int mainColumnX(int W, int mainW, int groupW) {
+		float charX = W * IsekaiConfig.get().characterScreenX;
+		int x = Math.max(Math.round(charX + 46), W / 2 - mainW / 2);
+		x = Math.min(x, W - 8 - groupW);
+		return Math.max(x, 52);
 	}
 
 	public static InventoryLayout compute(int width, int height, int buttons) {
