@@ -87,6 +87,10 @@ public class IsekaiClientGameTest implements FabricClientGameTest {
 			});
 			System.out.println("[isekai-test] " + camInfo);
 			ctx.takeScreenshot("isekai-02-inventario");
+			ctx.runOnClient(mc -> IsekaiInventoryScreen.debugHidePanels = true);
+			ctx.waitTicks(4);
+			ctx.takeScreenshot("isekai-02b-so-personagem");
+			ctx.runOnClient(mc -> IsekaiInventoryScreen.debugHidePanels = false);
 			boolean isekai = ctx.computeOnClient(mc -> mc.screen instanceof IsekaiInventoryScreen);
 			if (!isekai) throw new AssertionError("O inventario isekai nao abriu");
 

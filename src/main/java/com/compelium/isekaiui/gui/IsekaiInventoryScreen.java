@@ -33,6 +33,8 @@ public class IsekaiInventoryScreen extends AbstractContainerScreen<InventoryMenu
 	private static final float CLOSE_SECONDS = 0.18f;
 	private static final float TO_MAP_SECONDS = 0.14f;
 	private static boolean vanillaBypass;
+	/** So para testes automaticos: esconde as janelas para fotografar o personagem. */
+	public static boolean debugHidePanels;
 
 	private final Player owner;
 	private final int[] originalX;
@@ -308,7 +310,7 @@ public class IsekaiInventoryScreen extends AbstractContainerScreen<InventoryMenu
 
 	@Override
 	public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
-		if (this.layout == null) return;
+		if (this.layout == null || debugHidePanels) return;
 		if (this.closeNanos >= 0L && secondsSince(this.closeNanos) >= closeDuration()) {
 			finishClose();
 			return;
