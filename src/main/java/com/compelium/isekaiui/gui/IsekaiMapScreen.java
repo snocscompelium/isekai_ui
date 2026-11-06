@@ -814,6 +814,11 @@ public class IsekaiMapScreen extends Screen {
 		saveWaypoint();
 	}
 
+	/** Usado pelos testes automaticos: botao "compartilhar no chat" do editor aberto. */
+	public void debugShare() {
+		shareWaypoint();
+	}
+
 	/** Usado pelos testes automaticos. */
 	public void debugOpenEmblem(String land) {
 		openEmblemEditor(land);

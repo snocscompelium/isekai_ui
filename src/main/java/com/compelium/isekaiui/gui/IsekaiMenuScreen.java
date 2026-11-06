@@ -282,6 +282,12 @@ public abstract class IsekaiMenuScreen<T extends AbstractContainerMenu> extends 
 		return null;
 	}
 
+	/** Usado pelos testes automaticos: botao lateral pelo nome do icone. */
+	public Rect debugSideButtonRect(String icon) {
+		for (SideButton b : this.sideButtons) if (b.icon().equals(icon)) return sideButtonRect(b);
+		return null;
+	}
+
 	/** Usado pelos testes automaticos: posicao atual de uma janela. */
 	public Rect debugPanelRect(String id) {
 		Panel p = panel(id);

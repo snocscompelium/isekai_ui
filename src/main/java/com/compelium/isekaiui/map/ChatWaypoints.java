@@ -206,6 +206,11 @@ public final class ChatWaypoints {
 		}
 	}
 
+	/** Usado pelos testes automaticos: numero do ultimo botao [+ Marcador] criado. */
+	public static int debugLastId() {
+		return nextId - 1;
+	}
+
 	// ------------------------------------------------------------------ compartilhar os nossos
 
 	/** Texto para colar no chat, no formato que outros mods de mapa entendem. */

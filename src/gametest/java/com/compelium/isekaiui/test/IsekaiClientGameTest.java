@@ -1,6 +1,19 @@
 package com.compelium.isekaiui.test;
 
+import com.compelium.isekaiui.client.ReturnToContainer;
 import com.compelium.isekaiui.commands.CommandMemory;
+import com.compelium.isekaiui.creative.PersonalChest;
+import com.compelium.isekaiui.gui.IsekaiAnvilScreen;
+import com.compelium.isekaiui.gui.IsekaiBrewingScreen;
+import com.compelium.isekaiui.gui.IsekaiCraftingScreen;
+import com.compelium.isekaiui.gui.IsekaiCreativeScreen;
+import com.compelium.isekaiui.gui.IsekaiEnchantingScreen;
+import com.compelium.isekaiui.gui.IsekaiFurnaceScreen;
+import com.compelium.isekaiui.gui.IsekaiGrindstoneScreen;
+import com.compelium.isekaiui.gui.IsekaiSmithingScreen;
+import com.compelium.isekaiui.gui.IsekaiStonecutterScreen;
+import com.compelium.isekaiui.map.ChatWaypoints;
+import com.compelium.isekaiui.mixin.MinecraftAccessor;
 import com.compelium.isekaiui.gui.IsekaiChestScreen;
 import com.compelium.isekaiui.gui.IsekaiInventoryScreen;
 import com.compelium.isekaiui.gui.IsekaiMapScreen;
@@ -21,7 +34,9 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.world.inventory.ChestMenu;
+import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
@@ -299,6 +314,212 @@ public class IsekaiClientGameTest implements FabricClientGameTest {
 			ctx.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
 			ctx.waitTicks(20);
 
+			// ================================================================== v0.3
+			server.runCommand("item replace entity @a container.18 with minecraft:netherite_upgrade_smithing_template");
+			server.runCommand("item replace entity @a container.19 with minecraft:diamond_chestplate");
+			server.runCommand("item replace entity @a container.20 with minecraft:netherite_ingot");
+			server.runCommand("item replace entity @a container.21 with minecraft:lapis_lazuli 16");
+			server.runCommand("item replace entity @a container.22 with minecraft:stone 32");
+			server.runCommand("item replace entity @a container.23 with minecraft:diamond_sword[minecraft:custom_name='{\"text\":\"Lamina do Rei\",\"color\":\"gold\",\"italic\":false}',"
+					+ "minecraft:lore=['{\"text\":\"Arma lendaria do servidor\",\"color\":\"gray\"}'],minecraft:enchantments={levels:{\"minecraft:sharpness\":5}}]");
+			server.runCommand("xp add @a 30 levels");
+
+			// bau -> craft no inventario -> volta ao bau (o jogador olhando para o bau, como de verdade)
+			ctx.runOnClient(mc -> {
+				mc.player.setYRot(-90f);
+				mc.player.setXRot(29f);
+				mc.player.yRotO = -90f;
+				mc.player.xRotO = 29f;
+			});
+			ctx.waitTicks(4);
+			boolean aiming = ctx.computeOnClient(mc -> ReturnToContainer.lookedAtContainer() != null);
+			System.out.println("[isekai-test] mirando o bau: " + aiming);
+			ctx.runOnClient(mc -> ((MinecraftAccessor) mc).isekai$startUseItem());
+			ctx.waitTicks(30);
+			assertScreen(ctx, IsekaiChestScreen.class, "bau pela mira");
+			ctx.takeScreenshot("isekai-40-bau-com-botao-craft");
+			click(ctx, ctx.computeOnClient(mc -> ((IsekaiChestScreen) mc.screen).debugSideButtonRect("craft")), scale);
+			ctx.waitTicks(40);
+			assertScreen(ctx, IsekaiInventoryScreen.class, "inventario depois do botao craft");
+			ctx.takeScreenshot("isekai-41-craft-com-voltar-ao-bau");
+			Rect backButton = ctx.computeOnClient(mc -> ((IsekaiInventoryScreen) mc.screen).debugButtonRect("chest"));
+			if (backButton == null) throw new AssertionError("Sem o botao 'voltar ao bau'");
+			click(ctx, backButton, scale);
+			ctx.waitTicks(40);
+			assertScreen(ctx, IsekaiChestScreen.class, "de volta ao bau");
+			ctx.takeScreenshot("isekai-42-de-volta-ao-bau");
+			ctx.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
+			ctx.waitTicks(20);
+
+			// estacoes de trabalho
+			server.runCommand("execute at @p run setblock ~-2 ~ ~2 minecraft:crafting_table replace");
+			server.runCommand("execute at @p run setblock ~-1 ~ ~2 minecraft:furnace[facing=north]{Items:[{Slot:0b,id:\"minecraft:raw_iron\",count:12},{Slot:1b,id:\"minecraft:coal\",count:6}]} replace");
+			server.runCommand("execute at @p run setblock ~ ~ ~2 minecraft:anvil[facing=north] replace");
+			server.runCommand("execute at @p run setblock ~1 ~ ~2 minecraft:smithing_table replace");
+			server.runCommand("execute at @p run setblock ~2 ~ ~2 minecraft:grindstone[face=floor,facing=north] replace");
+			server.runCommand("execute at @p run setblock ~-2 ~ ~-2 minecraft:stonecutter[facing=south] replace");
+			server.runCommand("execute at @p run setblock ~-1 ~ ~-2 minecraft:brewing_stand{Items:["
+					+ "{Slot:0b,id:\"minecraft:potion\",count:1,components:{\"minecraft:potion_contents\":{potion:\"minecraft:water\"}}},"
+					+ "{Slot:1b,id:\"minecraft:potion\",count:1,components:{\"minecraft:potion_contents\":{potion:\"minecraft:water\"}}},"
+					+ "{Slot:3b,id:\"minecraft:nether_wart\",count:4},{Slot:4b,id:\"minecraft:blaze_powder\",count:8}]} replace");
+			server.runCommand("execute at @p run setblock ~ ~ ~-2 minecraft:enchanting_table replace");
+			server.runCommand("execute at @p run setblock ~1 ~ ~-2 minecraft:hopper{Items:[{Slot:0b,id:\"minecraft:apple\",count:5},{Slot:2b,id:\"minecraft:gold_nugget\",count:9}]} replace");
+			server.runCommand("execute at @p run setblock ~2 ~ ~-2 minecraft:blast_furnace[facing=south] replace");
+			ctx.waitTicks(10);
+
+			openStation(ctx, -2, 2, IsekaiCraftingScreen.class, "mesa de trabalho");
+			ctx.runOnClient(mc -> {
+				int id = mc.player.containerMenu.containerId;
+				mc.gameMode.handleInventoryMouseClick(id, 40, 0, ClickType.PICKUP, mc.player);
+				mc.gameMode.handleInventoryMouseClick(id, 1, 1, ClickType.PICKUP, mc.player);
+				mc.gameMode.handleInventoryMouseClick(id, 40, 0, ClickType.PICKUP, mc.player);
+			});
+			ctx.waitTicks(10);
+			ctx.takeScreenshot("isekai-43-mesa-de-trabalho");
+			closeStation(ctx);
+
+			openStation(ctx, -1, 2, IsekaiFurnaceScreen.class, "fornalha");
+			ctx.waitTicks(40);
+			ctx.takeScreenshot("isekai-44-fornalha");
+			closeStation(ctx);
+
+			openStation(ctx, 0, 2, IsekaiAnvilScreen.class, "bigorna");
+			quickMove(ctx, 30);
+			ctx.waitTicks(10);
+			ctx.takeScreenshot("isekai-45-bigorna");
+			closeStation(ctx);
+
+			openStation(ctx, 1, 2, IsekaiSmithingScreen.class, "ferraria");
+			quickMove(ctx, 13);
+			quickMove(ctx, 14);
+			quickMove(ctx, 15);
+			ctx.waitTicks(15);
+			ctx.takeScreenshot("isekai-46-ferraria-provador");
+			closeStation(ctx);
+
+			openStation(ctx, 2, 2, IsekaiGrindstoneScreen.class, "rebolo");
+			ctx.takeScreenshot("isekai-47-rebolo");
+			closeStation(ctx);
+
+			openStation(ctx, -2, -2, IsekaiStonecutterScreen.class, "cortador de pedras");
+			quickMove(ctx, 15);
+			ctx.waitTicks(10);
+			ctx.takeScreenshot("isekai-48-cortador");
+			closeStation(ctx);
+
+			openStation(ctx, -1, -2, IsekaiBrewingScreen.class, "suporte de pocoes");
+			ctx.waitTicks(30);
+			ctx.takeScreenshot("isekai-49-pocoes");
+			closeStation(ctx);
+
+			openStation(ctx, 0, -2, IsekaiEnchantingScreen.class, "mesa de encantamento");
+			quickMove(ctx, 30);
+			quickMove(ctx, 14);
+			ctx.waitTicks(15);
+			ctx.takeScreenshot("isekai-50-encantamento");
+			closeStation(ctx);
+
+			openStation(ctx, 1, -2, IsekaiChestScreen.class, "funil");
+			ctx.takeScreenshot("isekai-51-funil");
+			closeStation(ctx);
+
+			openStation(ctx, 2, -2, IsekaiFurnaceScreen.class, "alto-forno");
+			ctx.takeScreenshot("isekai-52-alto-forno");
+			closeStation(ctx);
+
+			// comando anotado a mao na lista de comandos rapidos
+			ctx.getInput().pressKey(options -> options.keyInventory);
+			ctx.waitTicks(40);
+			Rect listBtn = ctx.computeOnClient(mc -> ((IsekaiInventoryScreen) mc.screen).debugButtonRect("list"));
+			click(ctx, listBtn, scale);
+			ctx.waitTicks(10);
+			ctx.runOnClient(mc -> ((IsekaiInventoryScreen) mc.screen).debugAddCommand("/tp @s 0 100 0"));
+			ctx.waitTicks(10);
+			ctx.takeScreenshot("isekai-53-comando-anotado");
+			boolean noted = ctx.computeOnClient(mc -> CommandMemory.entries().stream().anyMatch(e -> e.command.equals("tp @s 0 100 0")));
+			if (!noted) throw new AssertionError("O comando anotado nao entrou na lista");
+			Rect listBtn2 = ctx.computeOnClient(mc -> ((IsekaiInventoryScreen) mc.screen).debugButtonRect("list"));
+			click(ctx, listBtn2, scale);
+			ctx.waitTicks(5);
+			ctx.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
+			ctx.waitTicks(20);
+
+			// marcadores compartilhados no chat por outros mods de mapa
+			ctx.runOnClient(mc -> {
+				mc.gui.getChat().addMessage(Component.literal("<Aldric> galera, a base nova: xaero-waypoint:Base do Cla:B:-60:70:-40:9:false:0:Internal-overworld-waypoints"));
+				mc.gui.getChat().addMessage(Component.literal("<Mirela> [name:\"Mina de Ouro\", x:40, y:52, z:-30, dim:minecraft:overworld]"));
+				mc.gui.getChat().addMessage(Component.literal("<Tobias> to aqui ó X: 18 Y: 64 Z: 25"));
+			});
+			ctx.getInput().pressKey(GLFW.GLFW_KEY_T);
+			ctx.waitTicks(10);
+			ctx.takeScreenshot("isekai-54-chat-com-marcadores");
+			ctx.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
+			ctx.waitTicks(5);
+			int lastId = ctx.computeOnClient(mc -> ChatWaypoints.debugLastId());
+			System.out.println("[isekai-test] ultimo botao de marcador do chat: " + lastId);
+			if (lastId < 3) throw new AssertionError("Os marcadores do chat nao foram reconhecidos (" + lastId + ")");
+			ctx.runOnClient(mc -> mc.player.connection.sendUnsignedCommand(ChatWaypoints.COMMAND + " waypoint " + (lastId - 2)));
+			ctx.waitTicks(30);
+			assertScreen(ctx, IsekaiMapScreen.class, "editor do marcador recebido");
+			ctx.takeScreenshot("isekai-55-marcador-do-chat");
+			ctx.runOnClient(mc -> ((IsekaiMapScreen) mc.screen).debugSaveWaypoint());
+			ctx.waitTicks(5);
+			ctx.takeScreenshot("isekai-56-mapa-com-marcador-do-chat");
+			ctx.runOnClient(mc -> {
+				int px = mc.player.getBlockX();
+				int pz = mc.player.getBlockZ();
+				((IsekaiMapScreen) mc.screen).debugOpenNewWaypoint(px + 5, pz + 5, "Fogueira");
+				((IsekaiMapScreen) mc.screen).debugShare();
+			});
+			ctx.waitTicks(10);
+			ctx.takeScreenshot("isekai-57-compartilhar-no-chat");
+			String shared = ctx.computeOnClient(mc -> String.valueOf(mc.screen));
+			System.out.println("[isekai-test] tela de compartilhar: " + shared);
+			ctx.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
+			ctx.waitTicks(10);
+
+			// criativo: catalogo, bau pessoal e copia de item personalizado
+			server.runCommand("gamemode creative @a");
+			ctx.waitTicks(10);
+			ctx.getInput().pressKey(options -> options.keyInventory);
+			ctx.waitTicks(40);
+			assertScreen(ctx, IsekaiCreativeScreen.class, "criativo isekai");
+			ctx.takeScreenshot("isekai-58-criativo");
+			ctx.runOnClient(mc -> ((IsekaiCreativeScreen) mc.screen).debugSearch("diamond"));
+			ctx.waitTicks(5);
+			ctx.takeScreenshot("isekai-59-criativo-busca");
+			double[] swordSlot = ctx.computeOnClient(mc -> slotCenter(mc, 23));
+			ctx.getInput().setCursorPos(swordSlot[0], swordSlot[1]);
+			ctx.waitTicks(2);
+			ctx.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
+			ctx.waitTicks(2);
+			ctx.runOnClient(mc -> {
+				IsekaiCreativeScreen cs = (IsekaiCreativeScreen) mc.screen;
+				cs.debugStoreCarried(0);
+				cs.debugTakeFromCatalog(0, true);
+				cs.debugStoreCarried(1);
+			});
+			ctx.waitTicks(5);
+			ctx.takeScreenshot("isekai-60-bau-pessoal");
+			boolean stored = ctx.computeOnClient(mc -> PersonalChest.get(0, 0).has(DataComponents.CUSTOM_NAME));
+			if (!stored) throw new AssertionError("O item personalizado nao foi guardado no bau pessoal");
+			ctx.runOnClient(mc -> ((IsekaiCreativeScreen) mc.screen).debugTakeCopy(0));
+			ctx.waitTicks(10);
+			int copiesOnServer = server.computeOnServer(s -> {
+				int n = 0;
+				for (net.minecraft.world.item.ItemStack st : s.getPlayerList().getPlayers().get(0).getInventory().items) {
+					if (st.has(DataComponents.CUSTOM_NAME)) n++;
+				}
+				return n;
+			});
+			System.out.println("[isekai-test] copias do item personalizado no servidor: " + copiesOnServer);
+			if (copiesOnServer < 1) throw new AssertionError("A copia do bau pessoal nao chegou ao servidor");
+			ctx.takeScreenshot("isekai-61-copia-no-inventario");
+			ctx.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
+			ctx.waitTicks(20);
+			server.runCommand("gamemode survival @a");
+			ctx.waitTicks(10);
+
 			// tela maior (1080p, escala 4)
 			ctx.getInput().resizeWindow(1920, 1080);
 			ctx.runOnClient(mc -> {
@@ -317,6 +538,32 @@ public class IsekaiClientGameTest implements FabricClientGameTest {
 			ctx.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
 			ctx.waitTicks(20);
 		}
+	}
+
+	private static void assertScreen(ClientGameTestContext ctx, Class<?> type, String what) {
+		boolean ok = ctx.computeOnClient(mc -> type.isInstance(mc.screen));
+		if (!ok) throw new AssertionError("Esperava " + type.getSimpleName() + " (" + what + "), mas a tela e " + ctx.computeOnClient(mc -> String.valueOf(mc.screen)));
+	}
+
+	/** Abre a estacao no bloco (dx, dz) relativo ao jogador e confere a tela isekai certa. */
+	private static void openStation(ClientGameTestContext ctx, int dx, int dz, Class<?> type, String what) {
+		ctx.runOnClient(mc -> {
+			BlockPos pos = BlockPos.containing(mc.player.getX() + dx, mc.player.getY(), mc.player.getZ() + dz);
+			mc.gameMode.useItemOn(mc.player, InteractionHand.MAIN_HAND, new BlockHitResult(Vec3.atCenterOf(pos).add(0, 0.5, 0), Direction.UP, pos, false));
+		});
+		ctx.waitTicks(30);
+		assertScreen(ctx, type, what);
+	}
+
+	private static void closeStation(ClientGameTestContext ctx) {
+		ctx.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
+		ctx.waitTicks(20);
+	}
+
+	/** Shift+clique num slot do menu aberto. */
+	private static void quickMove(ClientGameTestContext ctx, int slot) {
+		ctx.runOnClient(mc -> mc.gameMode.handleInventoryMouseClick(mc.player.containerMenu.containerId, slot, 0, ClickType.QUICK_MOVE, mc.player));
+		ctx.waitTicks(3);
 	}
 
 	/** Clique direito (usar) no bloco a "dx" blocos do jogador no eixo X. */
