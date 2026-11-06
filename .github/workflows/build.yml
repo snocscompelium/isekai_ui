@@ -4,6 +4,11 @@ on:
   push:
     branches: [ main ]
   workflow_dispatch:
+    inputs:
+      api_dump:
+        description: 'Gerar lista de assinaturas da API do Minecraft (para portar o mod)'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -34,8 +39,8 @@ jobs:
           set -o pipefail
           ./gradlew build --stacktrace 2>&1 | tee build.log
 
-      - name: Assinaturas da API do Minecraft (referencia)
-        if: always()
+      - name: Assinaturas da API do Minecraft (referencia, so quando pedido)
+        if: always() && github.event_name == 'workflow_dispatch' && inputs.api_dump
         run: bash ci/dump-api.sh > javap.txt 2>&1 || true
 
       - name: Preparar tela virtual
