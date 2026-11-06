@@ -22,6 +22,8 @@ public class IsekaiClientGameTest implements FabricClientGameTest {
 		ctx.getInput().resizeWindow(1280, 720);
 		ctx.runOnClient(mc -> {
 			mc.options.guiScale().set(3);
+			mc.options.renderDistance().set(7);
+			mc.options.simulationDistance().set(5);
 			mc.resizeDisplay();
 		});
 		try (TestSingleplayerContext sp = ctx.worldBuilder()
@@ -53,7 +55,8 @@ public class IsekaiClientGameTest implements FabricClientGameTest {
 			server.runCommand("execute at @a run summon minecraft:sheep ~9 ~ ~-6 {NoAI:1b}");
 			server.runCommand("execute at @a run summon minecraft:husk ~-8 ~ ~-9 {NoAI:1b}");
 
-			sp.getClientWorld().waitForChunksRender();
+			// renderizacao por software no GitHub e lenta: espera ate 5 minutos
+			sp.getClientWorld().waitForChunksRender(true, 20 * 60 * 5);
 			ctx.waitTicks(80);
 
 			// simula o titulo do plugin Lands e anda por alguns chunks dentro do "terreno"
