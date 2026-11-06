@@ -8,6 +8,10 @@ on:
       api_dump:
         description: 'Gerar lista de assinaturas da API do Minecraft (para portar o mod)'
         type: boolean
+      skip_tests:
+        description: "Pular o teste no jogo (so compilar)"
+        type: boolean
+        default: false
         default: false
 
 permissions:
@@ -44,14 +48,14 @@ jobs:
         run: bash ci/dump-api.sh > javap.txt 2>&1 || true
 
       - name: Preparar tela virtual
-        if: steps.build.outcome == 'success'
+        if: steps.build.outcome == 'success' && !(github.event_name == 'workflow_dispatch' && inputs.skip_tests)
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq xvfb libgl1-mesa-dri > /dev/null
 
       - name: Teste no jogo (prints da interface)
         id: gametest
-        if: steps.build.outcome == 'success'
+        if: steps.build.outcome == 'success' && !(github.event_name == 'workflow_dispatch' && inputs.skip_tests)
         continue-on-error: true
         timeout-minutes: 25
         run: |
