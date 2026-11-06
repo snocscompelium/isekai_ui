@@ -1577,6 +1577,11 @@ public class IsekaiCreativeScreen extends IsekaiMenuScreen<InventoryMenu> {
 		return cols();
 	}
 
+	/** Quantas celulas a grade mostra agora (itens do catalogo, 54 de uma aba, ou resultados da busca no bau). */
+	public int debugCellCount() {
+		return cellCount();
+	}
+
 	/** Abre a janela de conjuntos e veste o conjunto pelo numero (copias, como no criativo). */
 	public int debugEquipSet(int index) {
 		if (!IsekaiInventoryScreen.armorOpen) toggleArmor();

@@ -2,7 +2,10 @@ package com.compelium.isekaiui.test;
 
 import com.compelium.isekaiui.client.ReturnToContainer;
 import com.compelium.isekaiui.commands.CommandMemory;
+import com.compelium.isekaiui.client.Instruments;
+import com.compelium.isekaiui.creative.ArmorSets;
 import com.compelium.isekaiui.creative.PersonalChest;
+import com.compelium.isekaiui.lands.LandsTracker;
 import com.compelium.isekaiui.gui.IsekaiAnvilScreen;
 import com.compelium.isekaiui.gui.IsekaiBrewingScreen;
 import com.compelium.isekaiui.gui.IsekaiCraftingScreen;
@@ -35,6 +38,8 @@ import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.core.component.DataComponents;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.inventory.ChestMenu;
 import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.inventory.Slot;
@@ -306,7 +311,7 @@ public class IsekaiClientGameTest implements FabricClientGameTest {
 			ctx.waitTicks(15);
 			ctx.takeScreenshot("isekai-19-comando-fixado");
 			int buttons = ctx.computeOnClient(mc -> ((IsekaiInventoryScreen) mc.screen).debugButtonCount());
-			if (buttons != 4) throw new AssertionError("O comando fixado nao apareceu na barra (botoes: " + buttons + ")");
+			if (buttons != 5) throw new AssertionError("O comando fixado nao apareceu na barra (botoes: " + buttons + ")");
 			// fecha a lista e o inventario
 			Rect listAgain = ctx.computeOnClient(mc -> ((IsekaiInventoryScreen) mc.screen).debugButtonRect("list"));
 			click(ctx, listAgain, scale);
@@ -482,13 +487,73 @@ public class IsekaiClientGameTest implements FabricClientGameTest {
 			ctx.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
 			ctx.waitTicks(10);
 
-			// criativo: catalogo, bau pessoal e copia de item personalizado
+			// ================================================================== v0.4
+			// territorios marcados a mao no mapa grande (o chunk do jogador fica dentro do Reino de Aurora)
+			ctx.getInput().pressKey(GLFW.GLFW_KEY_M);
+			ctx.waitTicks(30);
+			assertScreen(ctx, IsekaiMapScreen.class, "mapa para marcar territorios");
+			ctx.runOnClient(mc -> {
+				int pcx = mc.player.getBlockX() >> 4;
+				int pcz = mc.player.getBlockZ() >> 4;
+				IsekaiMapScreen ms = (IsekaiMapScreen) mc.screen;
+				ms.debugPaintTerritory("Reino de Aurora", pcx - 1, pcz - 2, pcx + 2, pcz);
+				ms.debugPaintTerritory("Vale Sombrio", pcx + 3, pcz + 1, pcx + 5, pcz + 3);
+			});
+			double[] mapMid = ctx.computeOnClient(mc -> new double[]{mc.getWindow().getWidth() * 0.62, mc.getWindow().getHeight() * 0.62});
+			ctx.getInput().setCursorPos(mapMid[0], mapMid[1]);
+			ctx.waitTicks(10);
+			ctx.takeScreenshot("isekai-62-territorios-pintando");
+			ctx.runOnClient(mc -> ((IsekaiMapScreen) mc.screen).debugTerritoryMode(false));
+			ctx.waitTicks(10);
+			ctx.takeScreenshot("isekai-63-mapa-com-territorios");
+			String landHere = ctx.computeOnClient(mc -> String.valueOf(LandsTracker.currentLand()));
+			System.out.println("[isekai-test] territorio onde o jogador esta: " + landHere);
+			if (!"Reino de Aurora".equals(landHere)) throw new AssertionError("O chunk pintado nao virou territorio: " + landHere);
+			ctx.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
+			ctx.waitTicks(25);
+
+			// conjuntos de armadura no sobrevivencia: salva o de ferro, veste diamante (o ferro vai para a bolsa)
+			ctx.runOnClient(mc -> ArmorSets.saveCurrent(mc.player));
+			String[][] pieces = {{"head", "27", "diamond_helmet"}, {"chest", "28", "diamond_chestplate"},
+					{"legs", "29", "diamond_leggings"}, {"feet", "30", "diamond_boots"}};
+			for (String[] pc : pieces) {
+				server.runCommand("item replace entity @a container." + pc[1] + " from entity @p armor." + pc[0]);
+				server.runCommand("item replace entity @a armor." + pc[0] + " with minecraft:" + pc[2]);
+			}
+			ctx.waitTicks(10);
+			ctx.runOnClient(mc -> ArmorSets.saveCurrent(mc.player));
+			int sets = ctx.computeOnClient(mc -> ArmorSets.all().size());
+			if (sets != 2) throw new AssertionError("Esperava 2 conjuntos salvos, tem " + sets);
+			ctx.getInput().pressKey(options -> options.keyInventory);
+			ctx.waitTicks(40);
+			assertScreen(ctx, IsekaiInventoryScreen.class, "inventario para os conjuntos");
+			click(ctx, ctx.computeOnClient(mc -> ((IsekaiInventoryScreen) mc.screen).debugButtonRect("armor")), scale);
+			ctx.waitTicks(15);
+			ctx.takeScreenshot("isekai-64-conjuntos-de-armadura");
+			int missingSurvival = ctx.computeOnClient(mc -> ((IsekaiInventoryScreen) mc.screen).debugEquipSet(0));
+			ctx.waitTicks(15);
+			ctx.takeScreenshot("isekai-65-conjunto-vestido");
+			String headSurvival = wornOnServer(server, EquipmentSlot.HEAD);
+			System.out.println("[isekai-test] sobrevivencia: faltaram " + missingSurvival + ", cabeca=" + headSurvival);
+			if (missingSurvival != 0 || !headSurvival.equals("minecraft:iron_helmet")) {
+				throw new AssertionError("O conjunto de ferro nao foi vestido pela bolsa (faltaram " + missingSurvival + ", cabeca " + headSurvival + ")");
+			}
+			click(ctx, ctx.computeOnClient(mc -> ((IsekaiInventoryScreen) mc.screen).debugButtonRect("armor")), scale);
+			ctx.waitTicks(5);
+			ctx.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
+			ctx.waitTicks(20);
+
+			// criativo: catalogo, minimapa, bau pessoal com abas, conjuntos de armadura
 			server.runCommand("gamemode creative @a");
 			ctx.waitTicks(10);
 			ctx.getInput().pressKey(options -> options.keyInventory);
 			ctx.waitTicks(40);
 			assertScreen(ctx, IsekaiCreativeScreen.class, "criativo isekai");
 			ctx.takeScreenshot("isekai-58-criativo");
+			Rect creativeMini = panelRect(ctx, "minimap");
+			int creativeCols = ctx.computeOnClient(mc -> ((IsekaiCreativeScreen) mc.screen).debugColumns());
+			System.out.println("[isekai-test] criativo: minimapa=" + creativeMini + " colunas=" + creativeCols);
+			if (creativeMini == null) throw new AssertionError("O criativo nao tem minimapa");
 			ctx.runOnClient(mc -> ((IsekaiCreativeScreen) mc.screen).debugSearch("diamond"));
 			ctx.waitTicks(5);
 			ctx.takeScreenshot("isekai-59-criativo-busca");
@@ -502,12 +567,40 @@ public class IsekaiClientGameTest implements FabricClientGameTest {
 				cs.debugStoreCarried(0);
 				cs.debugTakeFromCatalog(0, true);
 				cs.debugStoreCarried(1);
+				cs.debugNewTab("Armas");
+				for (int i = 0; i < 6; i++) {
+					cs.debugTakeFromCatalog(4 + i, false);
+					cs.debugStoreCarried(i);
+				}
+				cs.debugNewTab("Blocos");
+				cs.debugTakeFromCatalog(0, true);
+				cs.debugStoreCarried(0);
+				cs.debugSelectTab(1);
 			});
+			ctx.getInput().setCursorPos(10, 10);
 			ctx.waitTicks(5);
-			ctx.takeScreenshot("isekai-60-bau-pessoal");
+			ctx.takeScreenshot("isekai-60-bau-pessoal-abas");
+			int tabCount = ctx.computeOnClient(mc -> PersonalChest.tabCount());
+			String tab1 = ctx.computeOnClient(mc -> PersonalChest.tabName(1));
 			boolean stored = ctx.computeOnClient(mc -> PersonalChest.get(0, 0).has(DataComponents.CUSTOM_NAME));
+			System.out.println("[isekai-test] bau pessoal: abas=" + tabCount + " aba1=" + tab1 + " personalizado=" + stored);
 			if (!stored) throw new AssertionError("O item personalizado nao foi guardado no bau pessoal");
-			ctx.runOnClient(mc -> ((IsekaiCreativeScreen) mc.screen).debugTakeCopy(0));
+			if (tabCount != 3 || !"Armas".equals(tab1)) throw new AssertionError("As abas do bau pessoal nao foram criadas: " + tabCount + " / " + tab1);
+			ctx.runOnClient(mc -> ((IsekaiCreativeScreen) mc.screen).debugOpenTabEditor(1));
+			ctx.waitTicks(10);
+			ctx.takeScreenshot("isekai-60b-editar-aba");
+			ctx.runOnClient(mc -> ((IsekaiCreativeScreen) mc.screen).debugCloseTabEditor());
+			ctx.runOnClient(mc -> ((IsekaiCreativeScreen) mc.screen).debugSearch("lamina"));
+			ctx.waitTicks(5);
+			ctx.takeScreenshot("isekai-60c-busca-no-bau");
+			int found = ctx.computeOnClient(mc -> ((IsekaiCreativeScreen) mc.screen).debugCellCount());
+			if (found != 1) throw new AssertionError("A busca no bau pessoal devia achar 1 item, achou " + found);
+			ctx.runOnClient(mc -> {
+				IsekaiCreativeScreen cs = (IsekaiCreativeScreen) mc.screen;
+				cs.debugSearch("");
+				cs.debugSelectTab(0);
+				cs.debugTakeCopy(0);
+			});
 			ctx.waitTicks(10);
 			int copiesOnServer = server.computeOnServer(s -> {
 				int n = 0;
@@ -519,10 +612,55 @@ public class IsekaiClientGameTest implements FabricClientGameTest {
 			System.out.println("[isekai-test] copias do item personalizado no servidor: " + copiesOnServer);
 			if (copiesOnServer < 1) throw new AssertionError("A copia do bau pessoal nao chegou ao servidor");
 			ctx.takeScreenshot("isekai-61-copia-no-inventario");
+			// conjuntos no criativo: veste o de diamante como copia
+			int missingCreative = ctx.computeOnClient(mc -> ((IsekaiCreativeScreen) mc.screen).debugEquipSet(1));
+			ctx.waitTicks(15);
+			ctx.takeScreenshot("isekai-61b-criativo-conjuntos");
+			String headCreative = wornOnServer(server, EquipmentSlot.HEAD);
+			System.out.println("[isekai-test] criativo: cabeca=" + headCreative);
+			if (missingCreative != 0 || !headCreative.equals("minecraft:diamond_helmet")) {
+				throw new AssertionError("O conjunto de diamante nao foi vestido no criativo (cabeca " + headCreative + ")");
+			}
+			ctx.runOnClient(mc -> ((IsekaiCreativeScreen) mc.screen).debugSetPersonal(false));
+			// minimapa do criativo abre o mapa grande, e a tecla do inventario volta para o criativo
+			click(ctx, panelRect(ctx, "minimap"), scale);
+			ctx.waitTicks(30);
+			assertScreen(ctx, IsekaiMapScreen.class, "mapa pelo minimapa do criativo");
+			ctx.getInput().pressKey(options -> options.keyInventory);
+			ctx.waitTicks(40);
+			assertScreen(ctx, IsekaiCreativeScreen.class, "de volta ao criativo");
+			ctx.takeScreenshot("isekai-61c-de-volta-ao-criativo");
 			ctx.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
 			ctx.waitTicks(20);
 			server.runCommand("gamemode survival @a");
 			ctx.waitTicks(10);
+
+			// bussola e relogio: com bussola na bolsa o minimapa aparece no jogo; relogio dentro de uma sacola vale
+			boolean before04 = ctx.computeOnClient(mc -> Instruments.hasCompass() || Instruments.hasClock());
+			if (before04) throw new AssertionError("Sem bussola/relogio o jogador nao devia ter os instrumentos");
+			server.runCommand("item replace entity @a container.31 with minecraft:compass");
+			server.runCommand("item replace entity @a container.32 with minecraft:bundle[minecraft:bundle_contents=[{id:\"minecraft:clock\",count:1}]]");
+			ctx.runOnClient(mc -> {
+				mc.player.setYRot(-90f);
+				mc.player.setXRot(0f);
+				mc.player.yRotO = -90f;
+				mc.player.xRotO = 0f;
+			});
+			ctx.waitTicks(15);
+			boolean instruments = ctx.computeOnClient(mc -> Instruments.hasCompass() && Instruments.hasClock() && !Instruments.holdingCompass());
+			if (!instruments) throw new AssertionError("A bussola na bolsa / relogio na sacola nao foram reconhecidos");
+			ctx.takeScreenshot("isekai-66-hud-com-bussola-e-relogio");
+			// segurando a bussola: marcadores aparecem no horizonte
+			server.runCommand("item replace entity @a weapon.offhand with minecraft:compass");
+			ctx.waitTicks(15);
+			boolean holding = ctx.computeOnClient(mc -> Instruments.holdingCompass());
+			if (!holding) throw new AssertionError("Segurar a bussola nao foi reconhecido");
+			ctx.takeScreenshot("isekai-67-marcadores-no-horizonte");
+			ctx.getInput().pressKey(options -> options.keyInventory);
+			ctx.waitTicks(40);
+			ctx.takeScreenshot("isekai-68-inventario-com-relogio");
+			ctx.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
+			ctx.waitTicks(20);
 
 			// tela maior (1080p, escala 4)
 			ctx.getInput().resizeWindow(1920, 1080);
@@ -542,6 +680,11 @@ public class IsekaiClientGameTest implements FabricClientGameTest {
 			ctx.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
 			ctx.waitTicks(20);
 		}
+	}
+
+	/** Id do item que o jogador veste no servidor naquele lugar do corpo. */
+	private static String wornOnServer(TestServerContext server, EquipmentSlot slot) {
+		return server.computeOnServer(s -> BuiltInRegistries.ITEM.getKey(s.getPlayerList().getPlayers().get(0).getItemBySlot(slot).getItem()).toString());
 	}
 
 	private static void assertScreen(ClientGameTestContext ctx, Class<?> type, String what) {
