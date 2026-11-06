@@ -30,11 +30,11 @@ public final class IsekaiConfig {
 	public boolean poseCharacter = true;
 	/** Esconde o item da mao enquanto o personagem mexe na janela. */
 	public boolean hideHeldItemsWhileBrowsing = true;
-	public float cameraDistance = 2.6f;
-	public float cameraSide = 1.45f;
-	public float cameraHeight = 0.25f;
+	public float cameraDistance = 3.1f;
+	public float cameraSide = 1.2f;
+	public float cameraHeight = 0.1f;
 	/** Posicao horizontal do personagem na tela com a camera em 3a pessoa (0 = esquerda, 0.5 = centro). */
-	public float characterScreenX = 0.25f;
+	public float characterScreenX = 0.24f;
 	public boolean animations = true;
 	public boolean uiSounds = true;
 	public float uiSoundVolume = 0.7f;
@@ -54,7 +54,7 @@ public final class IsekaiConfig {
 		/** Pixels de interface por bloco no minimapa. */
 		public float minimapZoom = 1.0f;
 		/** Pixels de interface por bloco ao abrir o mapa grande. */
-		public float mapZoom = 1.0f;
+		public float mapZoom = 2.0f;
 	}
 
 	public static final class LandsSettings {

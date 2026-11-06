@@ -38,7 +38,7 @@ public final class CinematicCamera {
 	public static void frame() {
 		Minecraft mc = Minecraft.getInstance();
 		long now = System.nanoTime();
-		float dt = lastNanos == 0L ? 0f : Math.min(0.1f, (now - lastNanos) / 1.0e9f);
+		float dt = lastNanos == 0L ? 0f : Math.min(0.5f, (now - lastNanos) / 1.0e9f);
 		lastNanos = now;
 
 		boolean want = mc.player != null && mc.screen instanceof IsekaiInventoryScreen screen && screen.wantsCinematicCamera();
@@ -68,6 +68,11 @@ public final class CinematicCamera {
 		}
 	}
 
+	/** Progresso da animacao (0 a 1), usado nos testes. */
+	public static float progress() {
+		return progress;
+	}
+
 	public static boolean active() {
 		return progress > 0f && haveBase;
 	}
@@ -89,16 +94,17 @@ public final class CinematicCamera {
 		double yawRad = Math.toRadians(baseYaw);
 		Vec3 forward = new Vec3(-Math.sin(yawRad), 0, Math.cos(yawRad));
 		Vec3 right = new Vec3(-Math.cos(yawRad), 0, -Math.sin(yawRad));
+		// atras e a DIREITA do personagem (por cima do ombro): assim ele fica virado para as janelas
 		Vec3 desired = eye
 				.add(forward.scale(-cfg.cameraDistance))
-				.add(right.scale(-cfg.cameraSide))
+				.add(right.scale(cfg.cameraSide))
 				.add(0, cfg.cameraHeight, 0);
 		Vec3 framed = clip(entity, eye, desired);
 
-		Vec3 look = eye.add(0, -0.55, 0).subtract(framed);
+		Vec3 look = eye.add(0, -0.8, 0).subtract(framed);
 		double horizontal = Math.sqrt(look.x * look.x + look.z * look.z);
 		float yaw = (float) Math.toDegrees(Math.atan2(-look.x, look.z)) + framingYawOffset(cfg.characterScreenX);
-		float pitch = (float) -Math.toDegrees(Math.atan2(look.y, horizontal)) + 4f;
+		float pitch = (float) -Math.toDegrees(Math.atan2(look.y, horizontal)) + 2f;
 
 		float e = eased();
 		Vec3 start = changedType ? eye : vanillaPos;

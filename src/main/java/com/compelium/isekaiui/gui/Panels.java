@@ -18,6 +18,9 @@ public final class Panels {
 		if (alpha <= 0.01f) return;
 		Draw.fill(g, r.x() + 2, r.y() + 3, r.right() + 3, r.bottom() + 4, Draw.alpha(Theme.SHADOW, alpha * 0.8f));
 		Draw.sprite(g, Theme.PANEL, r.x(), r.y(), r.w(), r.h(), alpha);
+		// brilho suave de "vidro" na metade de cima
+		Draw.gradient(g, r.x() + 5, r.y() + 5, r.right() - 5, r.y() + Math.max(8, r.h() / 2),
+				Draw.alpha(0x1CFFF4DC, alpha), 0x00FFF4DC);
 		if (title != null) {
 			Component t = upper(title);
 			int w = font.width(t) + 18;

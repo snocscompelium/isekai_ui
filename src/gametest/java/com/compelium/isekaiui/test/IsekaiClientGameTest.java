@@ -73,7 +73,9 @@ public class IsekaiClientGameTest implements FabricClientGameTest {
 			ctx.getInput().pressKey(options -> options.keyInventory);
 			ctx.waitTicks(3);
 			ctx.takeScreenshot("isekai-01-inventario-abrindo");
-			ctx.waitTicks(25);
+			ctx.waitTicks(60);
+			float cam = ctx.computeOnClient(mc -> com.compelium.isekaiui.camera.CinematicCamera.progress());
+			System.out.println("[isekai-test] progresso da camera no print do inventario: " + cam);
 			ctx.takeScreenshot("isekai-02-inventario");
 			boolean isekai = ctx.computeOnClient(mc -> mc.screen instanceof IsekaiInventoryScreen);
 			if (!isekai) throw new AssertionError("O inventario isekai nao abriu");
@@ -130,7 +132,7 @@ public class IsekaiClientGameTest implements FabricClientGameTest {
 			});
 			ctx.waitTicks(5);
 			ctx.getInput().pressKey(options -> options.keyInventory);
-			ctx.waitTicks(30);
+			ctx.waitTicks(60);
 			ctx.takeScreenshot("isekai-12-inventario-1080p");
 			ctx.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
 			ctx.waitTicks(20);
