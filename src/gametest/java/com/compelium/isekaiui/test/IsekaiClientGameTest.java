@@ -26,10 +26,8 @@ public class IsekaiClientGameTest implements FabricClientGameTest {
 			mc.options.simulationDistance().set(5);
 			mc.resizeDisplay();
 		});
-		try (TestSingleplayerContext sp = ctx.worldBuilder()
-				.setUseConsistentSettings(false)
-				.adjustSettings(creator -> creator.setSeed("isekai-ui"))
-				.create()) {
+		// mundo plano (rapido de gerar no GitHub); o cenario de teste e montado com comandos
+		try (TestSingleplayerContext sp = ctx.worldBuilder().create()) {
 			TestServerContext server = sp.getServer();
 			server.runCommand("gamerule doDaylightCycle false");
 			server.runCommand("gamerule doWeatherCycle false");
@@ -50,14 +48,14 @@ public class IsekaiClientGameTest implements FabricClientGameTest {
 			server.runCommand("item replace entity @a armor.legs with minecraft:iron_leggings");
 			server.runCommand("item replace entity @a armor.feet with minecraft:iron_boots");
 			server.runCommand("item replace entity @a weapon.offhand with minecraft:shield");
+			buildScene(server);
 			server.runCommand("execute at @a run summon minecraft:cow ~6 ~ ~4 {NoAI:1b}");
 			server.runCommand("execute at @a run summon minecraft:pig ~-5 ~ ~7 {NoAI:1b}");
 			server.runCommand("execute at @a run summon minecraft:sheep ~9 ~ ~-6 {NoAI:1b}");
 			server.runCommand("execute at @a run summon minecraft:husk ~-8 ~ ~-9 {NoAI:1b}");
 
-			// renderizacao por software no GitHub e lenta: espera os chunks chegarem e da um tempo para desenhar
-			sp.getClientWorld().waitForChunksDownload(20 * 60 * 3);
-			ctx.waitTicks(200);
+			sp.getClientWorld().waitForChunksRender(true, 20 * 60 * 4);
+			ctx.waitTicks(60);
 
 			// simula o titulo do plugin Lands e anda por alguns chunks dentro do "terreno"
 			ctx.runOnClient(mc -> mc.gui.setTitle(Component.literal("Reino de Aurora").withStyle(ChatFormatting.DARK_GREEN, ChatFormatting.BOLD)));
@@ -136,6 +134,47 @@ public class IsekaiClientGameTest implements FabricClientGameTest {
 			ctx.takeScreenshot("isekai-12-inventario-1080p");
 			ctx.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
 			ctx.waitTicks(20);
+		}
+	}
+
+	/** Monta um pequeno cenario (morro em degraus, lago, vila, arvores) para o mapa ter o que mostrar. */
+	private static void buildScene(TestServerContext server) {
+		String[] cmds = {
+				// morro em degraus (testa as curvas de nivel)
+				"fill ~12 ~-1 ~-14 ~40 ~2 ~14 minecraft:stone",
+				"fill ~16 ~3 ~-10 ~36 ~6 ~10 minecraft:stone",
+				"fill ~20 ~7 ~-6 ~32 ~10 ~6 minecraft:andesite",
+				"fill ~23 ~11 ~-3 ~29 ~14 ~3 minecraft:stone",
+				"fill ~23 ~15 ~-3 ~29 ~15 ~3 minecraft:snow_block",
+				"fill ~12 ~3 ~-14 ~40 ~3 ~14 minecraft:grass_block replace minecraft:air",
+				// lago com margem de areia
+				"fill ~-34 ~-1 ~-16 ~-10 ~-1 ~16 minecraft:sand",
+				"fill ~-31 ~-3 ~-13 ~-13 ~-1 ~13 minecraft:water",
+				"fill ~-27 ~-3 ~-8 ~-17 ~-3 ~8 minecraft:air",
+				"fill ~-27 ~-3 ~-8 ~-17 ~-3 ~8 minecraft:water",
+				// estrada e vila ao sul
+				"fill ~-1 ~-1 ~5 ~1 ~-1 ~44 minecraft:dirt_path",
+				"fill ~-9 ~ ~14 ~-3 ~3 ~20 minecraft:oak_planks hollow",
+				"fill ~-10 ~4 ~13 ~-2 ~4 ~21 minecraft:red_terracotta",
+				"fill ~3 ~ ~18 ~9 ~3 ~24 minecraft:cobblestone hollow",
+				"fill ~2 ~4 ~17 ~10 ~4 ~25 minecraft:dark_oak_planks",
+				"fill ~-9 ~ ~28 ~-3 ~3 ~35 minecraft:stone_bricks hollow",
+				"fill ~-10 ~4 ~27 ~-2 ~4 ~36 minecraft:blue_terracotta",
+				"fill ~3 ~ ~32 ~10 ~2 ~38 minecraft:spruce_planks hollow",
+				"fill ~2 ~3 ~31 ~11 ~3 ~39 minecraft:spruce_slab",
+				"fill ~-2 ~-1 ~24 ~2 ~-1 ~28 minecraft:cobblestone",
+				// arvores ao norte
+				"fill ~-6 ~ ~-22 ~-6 ~4 ~-22 minecraft:oak_log",
+				"fill ~-8 ~3 ~-24 ~-4 ~6 ~-20 minecraft:oak_leaves replace minecraft:air",
+				"fill ~2 ~ ~-28 ~2 ~5 ~-28 minecraft:oak_log",
+				"fill ~0 ~4 ~-30 ~4 ~7 ~-26 minecraft:oak_leaves replace minecraft:air",
+				"fill ~-14 ~ ~-30 ~-14 ~4 ~-30 minecraft:birch_log",
+				"fill ~-16 ~3 ~-32 ~-12 ~6 ~-28 minecraft:birch_leaves replace minecraft:air",
+				"fill ~8 ~ ~-36 ~8 ~4 ~-36 minecraft:spruce_log",
+				"fill ~6 ~3 ~-38 ~10 ~7 ~-34 minecraft:spruce_leaves replace minecraft:air",
+		};
+		for (String c : cmds) {
+			server.runCommand("execute at @p run " + c);
 		}
 	}
 
