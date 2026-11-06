@@ -8,10 +8,10 @@ on:
       api_dump:
         description: 'Gerar lista de assinaturas da API do Minecraft (para portar o mod)'
         type: boolean
+        default: false
       skip_tests:
         description: "Pular o teste no jogo (so compilar)"
         type: boolean
-        default: false
         default: false
 
 permissions:
