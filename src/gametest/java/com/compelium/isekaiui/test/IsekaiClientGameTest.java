@@ -22,7 +22,7 @@ public class IsekaiClientGameTest implements FabricClientGameTest {
 		ctx.getInput().resizeWindow(1280, 720);
 		ctx.runOnClient(mc -> {
 			mc.options.guiScale().set(3);
-			mc.options.renderDistance().set(7);
+			mc.options.renderDistance().set(6);
 			mc.options.simulationDistance().set(5);
 			mc.resizeDisplay();
 		});
@@ -55,9 +55,9 @@ public class IsekaiClientGameTest implements FabricClientGameTest {
 			server.runCommand("execute at @a run summon minecraft:sheep ~9 ~ ~-6 {NoAI:1b}");
 			server.runCommand("execute at @a run summon minecraft:husk ~-8 ~ ~-9 {NoAI:1b}");
 
-			// renderizacao por software no GitHub e lenta: espera ate 5 minutos
-			sp.getClientWorld().waitForChunksRender(true, 20 * 60 * 5);
-			ctx.waitTicks(80);
+			// renderizacao por software no GitHub e lenta: espera os chunks chegarem e da um tempo para desenhar
+			sp.getClientWorld().waitForChunksDownload(20 * 60 * 3);
+			ctx.waitTicks(200);
 
 			// simula o titulo do plugin Lands e anda por alguns chunks dentro do "terreno"
 			ctx.runOnClient(mc -> mc.gui.setTitle(Component.literal("Reino de Aurora").withStyle(ChatFormatting.DARK_GREEN, ChatFormatting.BOLD)));
