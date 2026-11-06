@@ -61,13 +61,13 @@
 	"isekai_ui.creative.title": "Creative",
 	"isekai_ui.creative.trash": "Trash (deletes the item you are holding)",
 	"isekai_ui.map.share": "Share in chat",
-	"isekai_ui.station.anvil_uses": "Already worked on an anvil %s time(s)",
+	"isekai_ui.station.anvil_uses": "Anvil uses: %s",
 	"isekai_ui.station.blaze_charges": "Blaze powder: %s charges",
 	"isekai_ui.station.burning": "Burning: %s",
 	"isekai_ui.station.not_burning": "Out",
 	"isekai_ui.station.fuel_for": "Fuel for %s items",
 	"isekai_ui.station.no_fuel": "No fuel",
 	"isekai_ui.station.ready_in": "Ready in %s",
-	"isekai_ui.station.smithing_error": "This combination doesn't work",
-	"isekai_ui.station.smithing_preview": "Look at your character: they're trying on the result"
+	"isekai_ui.station.smithing_error": "Invalid combination",
+	"isekai_ui.station.smithing_preview": "Trying it on you"
 }

@@ -322,6 +322,8 @@ public class IsekaiClientGameTest implements FabricClientGameTest {
 			server.runCommand("item replace entity @a container.22 with minecraft:stone 32");
 			server.runCommand("item replace entity @a container.23 with minecraft:diamond_sword[minecraft:custom_name='{\"text\":\"Lamina do Rei\",\"color\":\"gold\",\"italic\":false}',"
 					+ "minecraft:lore=['{\"text\":\"Arma lendaria do servidor\",\"color\":\"gray\"}'],minecraft:enchantments={levels:{\"minecraft:sharpness\":5}}]");
+			server.runCommand("item replace entity @a container.24 with minecraft:raw_iron 12");
+			server.runCommand("item replace entity @a container.25 with minecraft:coal 6");
 			server.runCommand("xp add @a 30 levels");
 
 			// bau -> craft no inventario -> volta ao bau (o jogador olhando para o bau, como de verdade)
@@ -353,7 +355,7 @@ public class IsekaiClientGameTest implements FabricClientGameTest {
 
 			// estacoes de trabalho
 			server.runCommand("execute at @p run setblock ~-2 ~ ~2 minecraft:crafting_table replace");
-			server.runCommand("execute at @p run setblock ~-1 ~ ~2 minecraft:furnace[facing=north]{Items:[{Slot:0b,id:\"minecraft:raw_iron\",count:12},{Slot:1b,id:\"minecraft:coal\",count:6}]} replace");
+			server.runCommand("execute at @p run setblock ~-1 ~ ~2 minecraft:furnace[facing=north] replace");
 			server.runCommand("execute at @p run setblock ~ ~ ~2 minecraft:anvil[facing=north] replace");
 			server.runCommand("execute at @p run setblock ~1 ~ ~2 minecraft:smithing_table replace");
 			server.runCommand("execute at @p run setblock ~2 ~ ~2 minecraft:grindstone[face=floor,facing=north] replace");
@@ -379,7 +381,9 @@ public class IsekaiClientGameTest implements FabricClientGameTest {
 			closeStation(ctx);
 
 			openStation(ctx, -1, 2, IsekaiFurnaceScreen.class, "fornalha");
-			ctx.waitTicks(40);
+			quickMove(ctx, 18);
+			quickMove(ctx, 19);
+			ctx.waitTicks(60);
 			ctx.takeScreenshot("isekai-44-fornalha");
 			closeStation(ctx);
 

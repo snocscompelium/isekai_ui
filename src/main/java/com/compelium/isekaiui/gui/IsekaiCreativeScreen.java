@@ -34,17 +34,15 @@ import java.util.Locale;
  * enviado ao servidor pelo mesmo pacote que o inventario criativo vanilla usa.
  */
 public class IsekaiCreativeScreen extends IsekaiMenuScreen<InventoryMenu> {
-	private static final int COLS = 8;
 	private static final int ROWS = 5;
 	private static final int TAB_S = 17;
-	private static final int CAT_W = 9 + COLS * InventoryLayout.SLOT + 4 + 4 + 9;
 	private static final int CAT_H = 8 + 2 * TAB_S + 4 + 12 + 4 + ROWS * InventoryLayout.SLOT + 8;
 	private static final int BAG_W = IsekaiStationScreen.BAG_W;
 	private static final int BAG_H = IsekaiStationScreen.BAG_H;
 	private static final int CHEST_H = 8 + 3 * InventoryLayout.SLOT + 8;
 	private static final int EQUIP_W = 36;
 	private static final int EQUIP_H = 7 + 4 * 22 - 2 + 12 + InventoryLayout.HEX_H + 7;
-	private static final int GROUP_W = EQUIP_W + 8 + CAT_W + 8 + BAG_W;
+	private static final int SIDE_W = InventoryLayout.HEX_W + 4;
 
 	private static boolean vanillaBypass;
 	/** null = busca (todos os itens). */
@@ -58,6 +56,9 @@ public class IsekaiCreativeScreen extends IsekaiMenuScreen<InventoryMenu> {
 	private List<CreativeModeTab> tabs = List.of();
 	private List<ItemStack> shown = List.of();
 	private int scrollRow;
+	/** Colunas do catalogo: 8, ou 7 quando a tela e estreita (os botoes laterais precisam caber). */
+	private int cols = 8;
+	private int catW = catWidth(8);
 	private EditBox search;
 	private CommandList commandList;
 	private float commandsAppearAt;
@@ -97,9 +98,23 @@ public class IsekaiCreativeScreen extends IsekaiMenuScreen<InventoryMenu> {
 		return "creative";
 	}
 
+	private static int catWidth(int cols) {
+		return 9 + cols * InventoryLayout.SLOT + 4 + 4 + 9;
+	}
+
+	private static int groupWidth(int cols) {
+		return EQUIP_W + 8 + catWidth(cols) + 8 + BAG_W + SIDE_W;
+	}
+
+	private void chooseColumns() {
+		this.cols = this.width >= groupWidth(8) + 12 ? 8 : 7;
+		this.catW = catWidth(this.cols);
+	}
+
 	@Override
 	protected boolean screenFits() {
-		return this.width >= GROUP_W + 16 && this.height >= 222 && this.menu.slots.size() >= 46;
+		chooseColumns();
+		return this.width >= groupWidth(this.cols) + 8 && this.height >= 222 && this.menu.slots.size() >= 46;
 	}
 
 	@Override
@@ -162,13 +177,14 @@ public class IsekaiCreativeScreen extends IsekaiMenuScreen<InventoryMenu> {
 		int W = this.width;
 		int H = this.height;
 		int tab = InventoryLayout.TAB;
-		int x0 = Math.max(8, (W - GROUP_W) / 2);
+		chooseColumns();
+		int x0 = Math.max(4, (W - groupWidth(this.cols)) / 2);
 		int rightH = tab + CHEST_H + 8 + tab + BAG_H;
 		int top = Math.max(tab + 4, (H - rightH) / 2 + tab);
 		Rect equipR = new Rect(x0, (H - EQUIP_H) / 2 + 4, EQUIP_W, EQUIP_H);
 		int barW = this.buttons.size() * InventoryLayout.BUTTON_STEP;
 		int catY = Math.max(tab + 4, (H - (tab + CAT_H + 6 + InventoryLayout.HEX_H)) / 2 + tab);
-		Rect catR = new Rect(x0 + EQUIP_W + 8, catY, CAT_W, CAT_H);
+		Rect catR = new Rect(x0 + EQUIP_W + 8, catY, this.catW, CAT_H);
 		Rect barR = new Rect(catR.cx() - barW / 2, catR.bottom() + 6, barW, InventoryLayout.HEX_H);
 		Rect chestR = new Rect(catR.right() + 8, top, BAG_W, CHEST_H);
 		Rect bagR = new Rect(catR.right() + 8, chestR.bottom() + 8 + tab, BAG_W, BAG_H);
@@ -209,7 +225,7 @@ public class IsekaiCreativeScreen extends IsekaiMenuScreen<InventoryMenu> {
 		addSideButton(this.bag, "trash", Component.translatable("isekai_ui.creative.trash"), this::trashCarried, () -> false);
 
 		String old = this.search == null ? lastSearch : this.search.getValue();
-		this.search = new EditBox(this.font, 0, 0, CAT_W - 18 - 14, 10, Component.translatable("isekai_ui.creative.search"));
+		this.search = new EditBox(this.font, 0, 0, this.catW - 18 - 14, 10, Component.translatable("isekai_ui.creative.search"));
 		this.search.setBordered(false);
 		this.search.setMaxLength(50);
 		this.search.setTextColor(Theme.TEXT);
@@ -294,7 +310,7 @@ public class IsekaiCreativeScreen extends IsekaiMenuScreen<InventoryMenu> {
 	}
 
 	private int maxScroll() {
-		int rows = (this.shown.size() + COLS - 1) / COLS;
+		int rows = (this.shown.size() + this.cols - 1) / this.cols;
 		return Math.max(0, rows - ROWS);
 	}
 
@@ -311,12 +327,12 @@ public class IsekaiCreativeScreen extends IsekaiMenuScreen<InventoryMenu> {
 	private Rect tabRect(Rect c, int i) {
 		// i = -1 e a aba de busca; as outras vem em seguida
 		int k = i + 1;
-		int perRow = (CAT_W - 16) / TAB_S;
+		int perRow = (this.catW - 16) / TAB_S;
 		return new Rect(c.x() + 8 + (k % perRow) * TAB_S, c.y() + 8 + (k / perRow) * TAB_S, TAB_S - 1, TAB_S - 1);
 	}
 
-	private static Rect searchRect(Rect c) {
-		return new Rect(c.x() + 8, c.y() + 8 + 2 * TAB_S + 4, CAT_W - 16, 12);
+	private Rect searchRect(Rect c) {
+		return new Rect(c.x() + 8, c.y() + 8 + 2 * TAB_S + 4, this.catW - 16, 12);
 	}
 
 	private static int chestX(Rect p) {
@@ -417,11 +433,11 @@ public class IsekaiCreativeScreen extends IsekaiMenuScreen<InventoryMenu> {
 		int gy = gridY(c);
 		this.hoveredItem = -1;
 		this.scrollRow = Mth.clamp(this.scrollRow, 0, maxScroll());
-		for (int i = 0; i < COLS * ROWS; i++) {
-			int x = gx + (i % COLS) * InventoryLayout.SLOT;
-			int y = gy + (i / COLS) * InventoryLayout.SLOT;
+		for (int i = 0; i < this.cols * ROWS; i++) {
+			int x = gx + (i % this.cols) * InventoryLayout.SLOT;
+			int y = gy + (i / this.cols) * InventoryLayout.SLOT;
 			Draw.sprite(g, Theme.SLOT, x - 1, y - 1, 18, 18, a);
-			int idx = this.scrollRow * COLS + i;
+			int idx = this.scrollRow * this.cols + i;
 			if (idx >= this.shown.size()) continue;
 			boolean hover = canHover && mouseX >= x - 1 && mouseX < x + 17 && mouseY >= y - 1 && mouseY < y + 17;
 			if (hover) {
@@ -431,7 +447,7 @@ public class IsekaiCreativeScreen extends IsekaiMenuScreen<InventoryMenu> {
 			if (a > 0.5f) g.renderItem(this.shown.get(idx), x, y);
 		}
 		if (maxScroll() > 0) {
-			int trackX = gx + COLS * InventoryLayout.SLOT + 3;
+			int trackX = gx + this.cols * InventoryLayout.SLOT + 3;
 			int trackH = ROWS * InventoryLayout.SLOT - 2;
 			Draw.fill(g, trackX, gy - 1, trackX + 4, gy - 1 + trackH, Draw.alpha(0xFF1A1620, a));
 			int barH = Math.max(8, trackH * ROWS / (ROWS + maxScroll()));

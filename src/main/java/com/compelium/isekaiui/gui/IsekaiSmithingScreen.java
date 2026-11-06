@@ -81,8 +81,7 @@ public class IsekaiSmithingScreen extends IsekaiStationScreen<SmithingMenu> {
 		if (SmithingPreview.isArmor(this.menu.getSlot(3).getItem())) line = Component.translatable("isekai_ui.station.smithing_preview");
 		else if (this.menu.hasRecipeError()) line = Component.translatable("isekai_ui.station.smithing_error");
 		if (line != null) {
-			int w = this.font.width(line);
-			smallText(g, line, r.cx() - w / 2, r.bottom() - 15, Theme.TEXT_DIM, alpha);
+			infoLine(g, line, r, Theme.TEXT_DIM, alpha);
 		}
 	}
 }

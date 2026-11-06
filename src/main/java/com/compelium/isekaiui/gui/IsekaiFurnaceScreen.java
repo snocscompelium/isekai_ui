@@ -85,8 +85,7 @@ public class IsekaiFurnaceScreen extends IsekaiStationScreen<AbstractFurnaceMenu
 		drawResultSlot(g, resultX(r), resultY(r), 2, alpha);
 		Component info = info();
 		if (info != null) {
-			int w = this.font.width(info);
-			smallText(g, info, r.cx() - w / 2, r.bottom() - 15, Theme.TEXT_DIM, alpha);
+			infoLine(g, info, r, Theme.TEXT_DIM, alpha);
 		}
 	}
 
@@ -95,7 +94,8 @@ public class IsekaiFurnaceScreen extends IsekaiStationScreen<AbstractFurnaceMenu
 		ContainerData d = data();
 		int litTime = d.get(0);
 		int progress = d.get(2);
-		int total = Math.max(1, d.get(3));
+		if (d.get(3) <= 0) return null; // o jogo ainda nao mandou o tempo de cozimento
+		int total = d.get(3);
 		ItemStack input = this.menu.slots.get(0).getItem();
 		ItemStack fuel = this.menu.slots.get(1).getItem();
 		int fuelTicks = litTime;

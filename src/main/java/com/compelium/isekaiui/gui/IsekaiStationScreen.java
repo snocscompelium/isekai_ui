@@ -209,6 +209,26 @@ public abstract class IsekaiStationScreen<T extends AbstractContainerMenu> exten
 		}
 	}
 
+	/** Linha de informacao centralizada no pe da estacao; se nao couber, encolhe (e corta no ultimo caso). */
+	protected void infoLine(GuiGraphics g, Component text, Rect r, int color, float alpha) {
+		int max = r.w() - 12;
+		int w = this.font.width(text);
+		int y = r.bottom() - 15;
+		if (w <= max) {
+			smallText(g, text, r.cx() - w / 2, y, color, alpha);
+			return;
+		}
+		float scale = Math.max(0.6f, (float) max / w);
+		Draw.push(g);
+		Draw.translate(g, r.cx(), y + 1);
+		Draw.scale(g, scale);
+		net.minecraft.util.FormattedCharSequence line = text.getVisualOrderText();
+		if (w * scale > max) line = net.minecraft.locale.Language.getInstance().getVisualOrder(this.font.substrByWidth(text, (int) (max / scale)));
+		int lw = this.font.width(line);
+		g.drawString(this.font, line, -lw / 2, 0, Draw.alpha(color, alpha), false);
+		Draw.pop(g);
+	}
+
 	protected void smallText(GuiGraphics g, Component text, int x, int y, int color, float alpha) {
 		Draw.text(g, this.font, text, x, y, Draw.alpha(color, alpha), false);
 	}

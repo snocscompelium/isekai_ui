@@ -79,8 +79,7 @@ public class IsekaiBrewingScreen extends IsekaiStationScreen<BrewingStandMenu> {
 		Component info = ticks > 0 ? Component.translatable("isekai_ui.station.ready_in", clock(ticks))
 				: fuel > 0 ? Component.translatable("isekai_ui.station.blaze_charges", fuel) : null;
 		if (info != null) {
-			int w = this.font.width(info);
-			smallText(g, info, r.cx() - w / 2, r.bottom() - 15, Theme.TEXT_DIM, alpha);
+			infoLine(g, info, r, Theme.TEXT_DIM, alpha);
 		}
 	}
 

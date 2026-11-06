@@ -150,8 +150,7 @@ public class IsekaiAnvilScreen extends IsekaiStationScreen<AnvilMenu> implements
 			if (work > 0) line = Component.translatable("isekai_ui.station.anvil_uses", 31 - Integer.numberOfLeadingZeros(work + 1));
 		}
 		if (line != null) {
-			int w = this.font.width(line);
-			smallText(g, line, r.cx() - w / 2, r.bottom() - 15, color, alpha);
+			infoLine(g, line, r, color, alpha);
 		}
 	}
 
