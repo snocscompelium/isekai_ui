@@ -4,8 +4,10 @@ import com.mojang.math.Axis;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.renderer.RenderType;
+import net.minecraft.locale.Language;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.FormattedCharSequence;
 
 /**
  * Todas as chamadas de desenho passam por aqui. Quando o mod for portado para outras versoes
@@ -63,6 +65,24 @@ public final class Draw {
 
 	public static void textCentered(GuiGraphics g, Font font, Component text, int cx, int y, int argb, boolean shadow) {
 		text(g, font, text, cx - font.width(text) / 2, y, argb, shadow);
+	}
+
+	/** Texto centralizado que encolhe (ate 60%) para caber na largura; se ainda nao couber, e cortado. */
+	public static void textFit(GuiGraphics g, Font font, Component text, int cx, int y, int maxW, int argb, boolean shadow) {
+		if (((argb >>> 24) & 0xFF) < 6 || maxW <= 4) return;
+		int w = font.width(text);
+		if (w <= maxW) {
+			textCentered(g, font, text, cx, y, argb, shadow);
+			return;
+		}
+		float scale = Math.max(0.6f, (float) maxW / w);
+		push(g);
+		translate(g, cx, y + 1);
+		scale(g, scale);
+		FormattedCharSequence line = text.getVisualOrderText();
+		if (w * scale > maxW) line = Language.getInstance().getVisualOrder(font.substrByWidth(text, (int) (maxW / scale)));
+		g.drawString(font, line, -font.width(line) / 2, 0, argb, shadow);
+		pop(g);
 	}
 
 	public static void push(GuiGraphics g) {

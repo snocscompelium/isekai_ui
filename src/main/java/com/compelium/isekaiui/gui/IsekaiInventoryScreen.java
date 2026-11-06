@@ -33,6 +33,7 @@ public class IsekaiInventoryScreen extends IsekaiMenuScreen<InventoryMenu> {
 	private static final int COMMANDS_W = CommandList.WIDTH;
 	private static boolean vanillaBypass;
 	static boolean commandsOpen;
+	static boolean armorOpen;
 
 	private final List<BarButton> buttons = new ArrayList<>();
 	private final MapView miniView = new MapView();
@@ -46,6 +47,9 @@ public class IsekaiInventoryScreen extends IsekaiMenuScreen<InventoryMenu> {
 	private int hoveredButton = -1;
 	private boolean miniHovered;
 	private CommandList commandList;
+	private ArmorSetList armorList;
+	private Panel armor;
+	private float armorAppearAt;
 	/** Momento (segundos desde que a tela abriu) em que a lista de comandos foi aberta, para animar a entrada. */
 	private float commandsAppearAt;
 
@@ -116,6 +120,35 @@ public class IsekaiInventoryScreen extends IsekaiMenuScreen<InventoryMenu> {
 		this.commands = addPanel("commands", this.commandsAppearAt, 0, 10, true, Component.translatable("isekai_ui.panel.commands"), cmdDef);
 		this.commands.overlay = true;
 		this.commands.visible = commandsOpen;
+		if (this.armorList == null) this.armorList = new ArmorSetList(this.font, new ArmorSetList.Host() {
+			@Override
+			public void addInput(net.minecraft.client.gui.components.EditBox box) {
+				addWidget(box);
+				setFocused(box);
+			}
+
+			@Override
+			public void removeInput(net.minecraft.client.gui.components.EditBox box) {
+				removeWidget(box);
+				setFocused(null);
+			}
+
+			@Override
+			public boolean creative() {
+				return false;
+			}
+
+			@Override
+			public net.minecraft.world.inventory.InventoryMenu menu() {
+				return IsekaiInventoryScreen.this.menu;
+			}
+		});
+		else this.armorList.stopTyping(false);
+		int ah = ArmorSetList.height();
+		Rect armorDef = new Rect(L.bar.cx() - ArmorSetList.WIDTH / 2, L.bar.y() - 10 - ah, ArmorSetList.WIDTH, ah);
+		this.armor = addPanel("armor_sets", this.armorAppearAt, 0, 10, true, Component.translatable("isekai_ui.panel.armor_sets"), armorDef);
+		this.armor.overlay = true;
+		this.armor.visible = armorOpen;
 	}
 
 	private void buildButtons() {
@@ -127,6 +160,7 @@ public class IsekaiInventoryScreen extends IsekaiMenuScreen<InventoryMenu> {
 				Component.translatable(third ? "isekai_ui.button.camera.third" : "isekai_ui.button.camera.first"),
 				this::toggleCamera, third));
 		this.buttons.add(new BarButton("list", Component.translatable("isekai_ui.button.commands"), this::toggleCommands, commandsOpen));
+		this.buttons.add(new BarButton("armor", Component.translatable("isekai_ui.button.armor_sets"), this::toggleArmor, armorOpen));
 		if (ReturnToContainer.available()) {
 			this.buttons.add(new BarButton("chest", Component.translatable("isekai_ui.button.back_to_chest"), this::returnToChest, false));
 		}
@@ -162,7 +196,7 @@ public class IsekaiInventoryScreen extends IsekaiMenuScreen<InventoryMenu> {
 
 	/** Quantos botoes a barra vai ter (fixos + comandos com pin + botoes do arquivo de configuracao). */
 	private static int expectedButtonCount() {
-		int n = 3 + CommandMemory.pinned().size() + (ReturnToContainer.available() ? 1 : 0);
+		int n = 4 + CommandMemory.pinned().size() + (ReturnToContainer.available() ? 1 : 0);
 		for (IsekaiConfig.MenuButton b : IsekaiConfig.get().menuButtons) {
 			if (b != null && b.command != null && !b.command.isBlank()) n++;
 		}
@@ -211,6 +245,12 @@ public class IsekaiInventoryScreen extends IsekaiMenuScreen<InventoryMenu> {
 		this.commandList.stopTyping(true);
 	}
 
+	/** Usado pelos testes automaticos: abre a janela de conjuntos e veste o conjunto pelo numero. */
+	public int debugEquipSet(int index) {
+		if (!armorOpen) toggleArmor();
+		return this.armorList.debugEquip(index);
+	}
+
 	public int debugButtonCount() {
 		return this.buttons.size();
 	}
@@ -238,7 +278,16 @@ public class IsekaiInventoryScreen extends IsekaiMenuScreen<InventoryMenu> {
 
 	private void toggleCommands() {
 		commandsOpen = !commandsOpen;
+		if (commandsOpen) armorOpen = false;
 		this.commandsAppearAt = time();
+		UiSounds.toggle();
+		this.rebuildWidgets();
+	}
+
+	private void toggleArmor() {
+		armorOpen = !armorOpen;
+		if (armorOpen) commandsOpen = false;
+		this.armorAppearAt = time();
 		UiSounds.toggle();
 		this.rebuildWidgets();
 	}
@@ -285,6 +334,8 @@ public class IsekaiInventoryScreen extends IsekaiMenuScreen<InventoryMenu> {
 			drawBar(g, p, mouseX, mouseY);
 		} else if (p == this.commands) {
 			this.commandList.draw(g, p.now, p.alpha, mouseX, mouseY, partialTick, !isClosing() && !isDraggingPanel());
+		} else if (p == this.armor) {
+			this.armorList.draw(g, p.now, p.alpha, mouseX, mouseY, partialTick, !isClosing() && !isDraggingPanel());
 		}
 	}
 
@@ -345,14 +396,22 @@ public class IsekaiInventoryScreen extends IsekaiMenuScreen<InventoryMenu> {
 		} else if (this.commands != null && this.commands.visible && this.commandList.tooltip() != null
 				&& this.commands.grabArea().contains(mouseX, mouseY)) {
 			this.setTooltipForNextRenderPass(this.commandList.tooltip());
+		} else if (this.armor != null && this.armor.visible && this.armorList.tooltip() != null
+				&& this.armor.grabArea().contains(mouseX, mouseY)) {
+			this.setTooltipForNextRenderPass(this.armorList.tooltip());
 		}
 	}
 
 	private Component regionName() {
+		return regionName(this.minecraft, this.owner);
+	}
+
+	/** Nome do lugar onde o jogador esta: o territorio marcado no mapa ou o bioma. */
+	static Component regionName(net.minecraft.client.Minecraft mc, Player player) {
 		String land = LandsTracker.currentLand();
 		if (land != null) return Component.literal(land);
-		if (this.minecraft != null && this.minecraft.level != null) {
-			return this.minecraft.level.getBiome(this.owner.blockPosition()).unwrapKey()
+		if (mc != null && mc.level != null && player != null) {
+			return mc.level.getBiome(player.blockPosition()).unwrapKey()
 					.map(k -> (Component) Component.translatable(Util.makeDescriptionId("biome", k.location())))
 					.orElse(Component.translatable("isekai_ui.map.unknown_region"));
 		}
@@ -378,6 +437,7 @@ public class IsekaiInventoryScreen extends IsekaiMenuScreen<InventoryMenu> {
 			return false;
 		}
 		if (p == this.commands) return this.commandList.click(p.now, mouseX, mouseY, button);
+		if (p == this.armor) return this.armorList.click(p.now, mouseX, mouseY, button);
 		return false;
 	}
 
@@ -386,6 +446,9 @@ public class IsekaiInventoryScreen extends IsekaiMenuScreen<InventoryMenu> {
 		if (this.commands != null && this.commands.visible && this.commands.grabArea().contains(mouseX, mouseY)) {
 			return this.commandList.scroll(scrollY);
 		}
+		if (this.armor != null && this.armor.visible && this.armor.grabArea().contains(mouseX, mouseY)) {
+			return this.armorList.scroll(scrollY);
+		}
 		return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
 	}
 
@@ -393,6 +456,7 @@ public class IsekaiInventoryScreen extends IsekaiMenuScreen<InventoryMenu> {
 	public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
 		if (isClosing()) return true;
 		if (this.commandList != null && this.commandList.isTyping()) return this.commandList.keyPressed(keyCode, scanCode, modifiers);
+		if (this.armorList != null && this.armorList.isTyping()) return this.armorList.keyPressed(keyCode, scanCode, modifiers);
 		if (IsekaiKeys.isMapKey(keyCode, scanCode)) {
 			openMap();
 			return true;

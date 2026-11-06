@@ -62,6 +62,8 @@ public abstract class IsekaiMenuScreen<T extends AbstractContainerMenu> extends 
 		public boolean overlay;
 		/** Espaco extra embaixo que tambem pertence a janela (ex.: coordenadas sob o minimapa). */
 		public int padBottom;
+		/** false: a subclasse desenha a(s) aba(s) do titulo (ex.: abas "Catalogo" e "Bau pessoal"). */
+		public boolean drawTitle = true;
 
 		public Panel(String id, float delay, int slideX, int slideY, boolean framed) {
 			this.id = id;
@@ -128,6 +130,11 @@ public abstract class IsekaiMenuScreen<T extends AbstractContainerMenu> extends 
 
 	/** Clique (sem arrastar) numa area da janela que nao e slot. */
 	protected boolean onPanelClick(Panel p, double mouseX, double mouseY, int button) {
+		return false;
+	}
+
+	/** Ponto da faixa do titulo que e um botao (ex.: aba de modo): clique duplo ali nao reseta a janela. */
+	protected boolean isTitleButton(Panel p, double mouseX, double mouseY) {
 		return false;
 	}
 
@@ -528,7 +535,7 @@ public abstract class IsekaiMenuScreen<T extends AbstractContainerMenu> extends 
 				Rect n = p.now;
 				Draw.fill(g, n.x() + 2, n.y() + 2, n.right() - 2, n.bottom() - 2, Draw.alpha(OVERLAY_BACKDROP, p.alpha));
 			}
-			Panels.panel(g, this.font, p.now, p.alpha, p.progress, p.title, time);
+			Panels.panel(g, this.font, p.now, p.alpha, p.progress, p.drawTitle ? p.title : null, time);
 		}
 		drawPanel(g, p, partialTick, mouseX, mouseY);
 		drawSideButtons(g, p);
@@ -640,7 +647,7 @@ public abstract class IsekaiMenuScreen<T extends AbstractContainerMenu> extends 
 				UiSounds.click();
 				return true;
 			}
-			boolean onTab = p.title != null && mouseY < p.now.y();
+			boolean onTab = p.title != null && mouseY < p.now.y() && !isTitleButton(p, mouseX, mouseY);
 			long now = System.nanoTime();
 			if (onTab && p == this.lastClickPanel && now - this.lastClickNanos < 350_000_000L) {
 				p.rect = clampToScreen(p, p.def);

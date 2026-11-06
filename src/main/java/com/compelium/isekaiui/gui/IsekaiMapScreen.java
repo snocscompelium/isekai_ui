@@ -422,6 +422,11 @@ public class IsekaiMapScreen extends Screen {
 		for (int i = 1; i <= steps; i++) paintAt(x0 + (x1 - x0) * i / steps, y0 + (y1 - y0) * i / steps);
 	}
 
+	/** Usado pelos testes automaticos: entra ou sai do modo de marcar territorios. */
+	public void debugTerritoryMode(boolean on) {
+		if (this.territoryMode != on) toggleTerritoryMode();
+	}
+
 	/** Usado pelos testes automaticos: liga o modo territorio, cria/seleciona um reino e pinta chunks. */
 	public void debugPaintTerritory(String kingdom, int fromChunkX, int fromChunkZ, int toChunkX, int toChunkZ) {
 		if (!this.territoryMode) toggleTerritoryMode();
@@ -936,7 +941,9 @@ public class IsekaiMapScreen extends Screen {
 		if (this.closeNanos >= 0L) return;
 		closePopup();
 		UiSounds.click();
-		startClose(IsekaiInventoryScreen.minimapRect(this.width, this.height), () -> {
+		boolean creative = this.minecraft.gameMode != null && this.minecraft.gameMode.hasInfiniteItems() && IsekaiConfig.get().enableCreative;
+		Rect target = creative ? IsekaiCreativeScreen.minimapRect(this.width, this.height) : IsekaiInventoryScreen.minimapRect(this.width, this.height);
+		startClose(target, () -> {
 			if (this.minecraft.player != null) this.minecraft.setScreen(new InventoryScreen(this.minecraft.player));
 		});
 	}
