@@ -34,6 +34,7 @@ public final class IsekaiConfig {
 	public boolean enableStations = true;
 	/** Inventario do modo criativo no estilo isekai (catalogo, bau pessoal e comandos anotados). */
 	public boolean enableCreative = true;
+	public InstrumentSettings instruments = new InstrumentSettings();
 	/** Camera em terceira pessoa ao abrir o inventario (F5 dentro do inventario alterna). */
 	public boolean thirdPersonCamera = true;
 	/** Personagem levanta os bracos "mexendo" na janela. */
@@ -79,6 +80,8 @@ public final class IsekaiConfig {
 	public static final class LandsSettings {
 		public String _info = "Le os titulos que o plugin Lands mostra ao entrar/sair de terrenos e marca os chunks no mapa. Ligue 'debug' para ver no chat cada titulo recebido e ajustar os padroes.";
 		public boolean enabled = true;
+		/** Ler os titulos do Lands sozinho. Desligado: os territorios sao marcados a mao no mapa. */
+		public boolean autoDetect = false;
 		public boolean readTitle = true;
 		public boolean readSubtitle = false;
 		public boolean readActionBar = false;
@@ -94,6 +97,16 @@ public final class IsekaiConfig {
 				"(?i)^\\s*terra\\s+sem\\s+dono\\s*$",
 				"(?i)^\\s*zona\\s+livre\\s*$"));
 		public boolean debug = false;
+	}
+
+	public static final class InstrumentSettings {
+		public String _info = "Relogio e bussola: sem relogio o minimapa mostra so o sol/lua, com relogio mostra a hora. A bussola libera as coordenadas e o minimapa durante o jogo; segurando a bussola os marcadores aparecem no horizonte. hudCorner: top_left, top_right, bottom_left ou bottom_right.";
+		public boolean requireClock = true;
+		public boolean requireCompass = true;
+		public boolean hudMinimap = true;
+		public String hudCorner = "top_left";
+		public int hudSize = 84;
+		public boolean horizonMarkers = true;
 	}
 
 	public static final class MenuButton {
@@ -146,6 +159,8 @@ public final class IsekaiConfig {
 		if (lands.landPattern == null || lands.landPattern.isBlank()) lands.landPattern = "^\\s*(?<land>.+?)\\s*$";
 		if (lands.requiredColor == null) lands.requiredColor = "";
 		if (map.shareFormat == null || map.shareFormat.isBlank()) map.shareFormat = "xaero";
+		if (instruments == null) instruments = new InstrumentSettings();
+		if (instruments.hudCorner == null) instruments.hudCorner = "top_left";
 		map.exploreRadiusChunks = clamp(map.exploreRadiusChunks, 1, 16);
 		map.minimapZoom = clamp(map.minimapZoom, 0.25f, 4f);
 		map.mapZoom = clamp(map.mapZoom, 0.0625f, 6f);

@@ -423,6 +423,32 @@ def map_dot():
     return img
 
 
+def dial():
+    """Medalhao redondo do sol/relogio: aro dourado e fundo de vidro escuro."""
+    s = 22
+    img = new(s, s)
+    px = img.load()
+    c = s / 2.0
+    for y in range(s):
+        for x in range(s):
+            dx = x + 0.5 - c
+            dy = y + 0.5 - c
+            r = math.sqrt(dx * dx + dy * dy)
+            if r > 10.9:
+                continue
+            if r > 9.9:
+                px[x, y] = rgba(INK)
+            elif r > 8.6:
+                px[x, y] = rgba(GOLD_HI if dy < -2 else (GOLD if dy < 4 else GOLD_DK))
+            elif r > 7.8:
+                px[x, y] = rgba(INK, 220)
+            else:
+                k = (dy + 8) / 16.0
+                col = tuple(int(GLASS_HI[i] * (1 - k) + GLASS[i] * k) for i in range(3))
+                px[x, y] = rgba(col, 235)
+    return img
+
+
 def pixelize(big_img, size):
     """Reduz uma imagem grande para pixel art (sem bordas borradas)."""
     small = big_img.resize((size, size), Image.LANCZOS)
@@ -743,6 +769,48 @@ ICONS = {
         ".##########.",
         ".##########.",
         "..########..",
+        "............",
+    ],
+    "sun": [
+        ".....##.....",
+        ".#...##...#.",
+        "..#......#..",
+        "....####....",
+        "...######...",
+        "##.######.##",
+        "##.######.##",
+        "...######...",
+        "....####....",
+        "..#......#..",
+        ".#...##...#.",
+        ".....##.....",
+    ],
+    "moon": [
+        "...#####....",
+        "..####......",
+        ".####.......",
+        ".###........",
+        "####........",
+        "####........",
+        "####........",
+        "####........",
+        ".###........",
+        ".####.......",
+        "..####......",
+        "...#####....",
+    ],
+    "armor": [
+        "..###..###..",
+        ".####..####.",
+        "############",
+        "############",
+        ".##########.",
+        "..########..",
+        "..########..",
+        "..########..",
+        "..########..",
+        "..###..###..",
+        "..##....##..",
         "............",
     ],
     "list": [
@@ -1486,6 +1554,7 @@ def main():
     out["hex_button_hover"] = (hex_button_hover(), sprites + "hex_button_hover.png", None)
     out["hex_button_on"] = (hex_button_on(), sprites + "hex_button_on.png", None)
     out["craft_arrow"] = (craft_arrow(), sprites + "craft_arrow.png", None)
+    out["dial"] = (dial(), sprites + "dial.png", None)
     out["progress_arrow"] = (progress_arrow(False), sprites + "progress_arrow.png", None)
     out["progress_arrow_full"] = (progress_arrow(True), sprites + "progress_arrow_full.png", None)
     for name, rows in ICONS.items():

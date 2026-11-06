@@ -24,6 +24,9 @@ import java.util.Map;
 
 /** Desenha o mapa de pergaminho dentro de um retangulo da tela. */
 public final class MapRenderer {
+	/** Ligado pela tela do mapa enquanto o jogador marca territorios: grade e reinos sempre visiveis. */
+	public static boolean territoryEditing;
+
 	private MapRenderer() {
 	}
 
@@ -69,8 +72,8 @@ public final class MapRenderer {
 		}
 		tiles.buildPending(mini ? 3_000_000L : 7_000_000L);
 
-		if (settings.showGrid && !mini) drawGrid(g, view, r, alpha);
-		if (settings.showClaims) drawClaims(g, map, view, r, alpha, !mini, mc.font);
+		if ((settings.showGrid || territoryEditing) && !mini) drawGrid(g, view, r, alpha);
+		if (settings.showClaims || territoryEditing) drawClaims(g, map, view, r, alpha, !mini, mc.font);
 		if (settings.showEntities) drawEntities(g, view, r, alpha, partialTick);
 		if (settings.showWaypoints) drawWaypoints(g, map, view, r, alpha, mini, mc.font);
 		drawPlayer(g, view, r, alpha, partialTick);

@@ -26,6 +26,7 @@ public final class Theme {
 	// Sprites (atlas de GUI: assets/isekai_ui/textures/gui/sprites/*.png)
 	public static final ResourceLocation PANEL = IsekaiUI.id("panel");
 	public static final ResourceLocation MAP_FRAME = IsekaiUI.id("map_frame");
+	public static final ResourceLocation DIAL = IsekaiUI.id("dial");
 	public static final ResourceLocation MAP_FRAME_GLOW = IsekaiUI.id("map_frame_glow");
 	public static final ResourceLocation TAB = IsekaiUI.id("tab");
 	public static final ResourceLocation SLOT = IsekaiUI.id("slot");
@@ -57,7 +58,8 @@ public final class Theme {
 			"map", "camera_third", "camera_first", "inventory", "center", "entities", "claims", "grid", "close", "back",
 			"star", "sword", "paw", "scroll", "coin", "house", "book", "gear", "people", "flag", "compass", "potion",
 			"list", "pin", "gem", "skull", "tree", "pickaxe", "anchor", "portal", "tower",
-			"craft", "chest", "flame", "trash", "search", "plus", "catalog", "chat", "next", "prev", "potion_rack");
+			"craft", "chest", "flame", "trash", "search", "plus", "catalog", "chat", "next", "prev", "potion_rack",
+			"sun", "moon", "armor");
 
 	public static ResourceLocation icon(String name) {
 		return IsekaiUI.id("icon/" + (ICONS.contains(name) ? name : "star"));
@@ -70,6 +72,8 @@ public final class Theme {
 
 	public static int landColor(String name) {
 		if (name == null) return 0x888888;
+		Integer chosen = com.compelium.isekaiui.map.Kingdoms.color(name);
+		if (chosen != null) return chosen;
 		int h = name.toLowerCase(java.util.Locale.ROOT).hashCode();
 		h ^= (h >>> 16);
 		return LAND_COLORS[Math.floorMod(h, LAND_COLORS.length)];

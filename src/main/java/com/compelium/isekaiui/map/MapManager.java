@@ -70,6 +70,7 @@ public final class MapManager {
 			currentKey = key;
 			LandsTracker.reset();
 			Emblems.load(serverDir(server));
+			Kingdoms.load(serverDir(server));
 		}
 		ticks++;
 		int pcx = mc.player.chunkPosition().x;

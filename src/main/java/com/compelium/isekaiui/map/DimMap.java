@@ -171,6 +171,29 @@ public final class DimMap {
 		claimsVersion++;
 	}
 
+	/** Troca o nome do dono em todos os chunks (sem diferenciar maiusculas). */
+	public void renameClaims(String oldName, String newName) {
+		boolean changed = false;
+		for (Long2ObjectMap.Entry<String> e : claims.long2ObjectEntrySet()) {
+			if (e.getValue().equalsIgnoreCase(oldName)) {
+				e.setValue(newName);
+				changed = true;
+			}
+		}
+		if (changed) {
+			claimsDirty = true;
+			claimsVersion++;
+		}
+	}
+
+	/** Apaga todos os chunks de um dono. */
+	public void removeClaims(String name) {
+		if (claims.values().removeIf(v -> v.equalsIgnoreCase(name))) {
+			claimsDirty = true;
+			claimsVersion++;
+		}
+	}
+
 	public Long2ObjectOpenHashMap<String> claims() {
 		return claims;
 	}

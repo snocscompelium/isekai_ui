@@ -56,6 +56,13 @@ public class IsekaiMapScreen extends Screen {
 	private Runnable afterClose;
 	private boolean follow = true;
 	private boolean dragging;
+	// ---- territorios marcados a mao
+	private TerritoryPanel territory;
+	private boolean territoryMode;
+	private boolean painting;
+	private boolean paintErase;
+	private double lastPaintX;
+	private double lastPaintY;
 	private int hoveredButton = -1;
 
 	// ---- popups
@@ -125,7 +132,23 @@ public class IsekaiMapScreen extends Screen {
 		this.buttons.add(new MapButton("entities", Component.translatable("isekai_ui.button.entities"), () -> toggle(() -> ms.showEntities = !ms.showEntities), () -> ms.showEntities));
 		this.buttons.add(new MapButton("claims", Component.translatable("isekai_ui.button.claims"), () -> toggle(() -> ms.showClaims = !ms.showClaims), () -> ms.showClaims));
 		this.buttons.add(new MapButton("pin", Component.translatable("isekai_ui.button.waypoints"), () -> toggle(() -> ms.showWaypoints = !ms.showWaypoints), () -> ms.showWaypoints));
+		this.buttons.add(new MapButton("flag", Component.translatable("isekai_ui.button.territories"), this::toggleTerritoryMode, () -> this.territoryMode));
 		this.buttons.add(new MapButton("grid", Component.translatable("isekai_ui.button.grid"), () -> toggle(() -> ms.showGrid = !ms.showGrid), () -> ms.showGrid));
+		if (this.territory == null) {
+			this.territory = new TerritoryPanel(this.font, new TerritoryPanel.Host() {
+				@Override
+				public void addInput(EditBox box) {
+					addWidget(box);
+				}
+
+				@Override
+				public void removeInput(EditBox box) {
+					removeWidget(box);
+				}
+			});
+		} else {
+			this.territory.stopTyping(false);
+		}
 		if (this.popup == Popup.WAYPOINT) layoutWaypointEditor(this.nameBox == null ? "" : this.nameBox.getValue());
 		if (this.pendingShared != null) {
 			Waypoints.Waypoint shared = this.pendingShared;
@@ -233,11 +256,14 @@ public class IsekaiMapScreen extends Screen {
 
 		Draw.fill(g, r.x() - 3, r.y() + 3, r.right() + 7, r.bottom() + 10, Draw.alpha(Theme.SHADOW, a));
 		DimMap map = MapManager.current();
+		MapRenderer.territoryEditing = this.territoryMode;
 		MapRenderer.draw(g, map, this.view, r, a, partialTick, false);
 		Draw.sprite(g, Theme.MAP_FRAME, r.x() - 6, r.y() - 6, r.w() + 12, r.h() + 12, Math.max(a, chrome));
 
+		MapRenderer.territoryEditing = false;
 		updateHover(mouseX, mouseY);
 		if (chrome > 0.01f) drawChrome(g, r, chrome, mouseX, mouseY, map);
+		if (this.territoryMode && this.closeNanos < 0L) drawTerritory(g, r, mouseX, mouseY, partialTick);
 		if (this.popup != Popup.NONE && this.closeNanos < 0L) drawPopup(g, mouseX, mouseY, partialTick);
 		super.render(g, mouseX, mouseY, partialTick);
 		if (this.closeNanos < 0L && this.popup == Popup.NONE && this.hoveredButton >= 0) {
@@ -250,28 +276,33 @@ public class IsekaiMapScreen extends Screen {
 		int tabW = Math.min(r.w() - 40, Math.max(90, this.font.width(region) + 30));
 		Panels.tab(g, this.font, r.cx() - tabW / 2, r.y() - 6 - InventoryLayout.TAB, tabW, region, a);
 
-		if (r.contains(mouseX, mouseY) && this.closeNanos < 0L && this.popup == Popup.NONE) {
+		if (r.contains(mouseX, mouseY) && this.closeNanos < 0L && this.popup == Popup.NONE && !this.territoryMode) {
 			int wx = Mth.floor(MapRenderer.toWorldX(this.view, r, mouseX));
 			int wz = Mth.floor(MapRenderer.toWorldZ(this.view, r, mouseY));
-			Component line = Component.literal("X " + wx + "   Z " + wz);
+			boolean coords = com.compelium.isekaiui.client.Instruments.showCoordinates();
+			Component line = coords ? Component.literal("X " + wx + "   Z " + wz) : null;
 			Waypoints.Waypoint hovered = map == null ? null : waypointAt(map, r, mouseX, mouseY);
 			String owner = map == null ? null : map.claim(wx >> 4, wz >> 4);
 			if (hovered != null) {
 				net.minecraft.network.chat.MutableComponent name = hovered.name == null || hovered.name.isBlank()
 						? Component.translatable("isekai_ui.map.waypoint_default") : Component.literal(hovered.name);
-				line = name.append(Component.literal("   X " + hovered.x + "   Y " + hovered.y + "   Z " + hovered.z));
+				line = coords ? name.append(Component.literal("   X " + hovered.x + "   Y " + hovered.y + "   Z " + hovered.z)) : name;
 			} else if (owner != null) {
-				line = Component.translatable("isekai_ui.map.claim", owner).append(Component.literal("   X " + wx + "   Z " + wz));
+				net.minecraft.network.chat.MutableComponent claim = Component.translatable("isekai_ui.map.claim", owner);
+				line = coords ? claim.append(Component.literal("   X " + wx + "   Z " + wz)) : claim;
 			}
-			int w = this.font.width(line) + 12;
-			Draw.sprite(g, Theme.PILL, r.x() + 6, r.bottom() - 18, w, 13, a * 0.92f);
-			Draw.text(g, this.font, line, r.x() + 12, r.bottom() - 15, Draw.alpha(Theme.TEXT, a), false);
+			if (line != null) {
+				int w = this.font.width(line) + 12;
+				Draw.sprite(g, Theme.PILL, r.x() + 6, r.bottom() - 18, w, 13, a * 0.92f);
+				Draw.text(g, this.font, line, r.x() + 12, r.bottom() - 15, Draw.alpha(Theme.TEXT, a), false);
+			}
 			if (map != null && map.waypoints().all().size() < 3) {
 				Component hint = Component.translatable("isekai_ui.map.right_click_hint");
 				Draw.text(g, this.font, hint, r.x() + 8, r.y() + 6, Draw.alpha(Theme.MAP_INK, a * 0.75f), false);
 			}
 		}
 
+		SkyDial.draw(g, this.font, r.right() - 16, r.y() + 14, a);
 		Component zoom = Component.literal(String.format(java.util.Locale.ROOT, "x%.2f", this.view.zoom));
 		Draw.text(g, this.font, zoom, r.right() - 8 - this.font.width(zoom), r.bottom() - 15 - InventoryLayout.HEX_H - 4,
 				Draw.alpha(Theme.MAP_INK, a), false);
@@ -329,6 +360,78 @@ public class IsekaiMapScreen extends Screen {
 			}
 		}
 		return best;
+	}
+
+	// ------------------------------------------------------------------ territorios
+
+	private void toggleTerritoryMode() {
+		this.territoryMode = !this.territoryMode;
+		this.painting = false;
+		if (this.territory != null) this.territory.stopTyping(false);
+		if (this.territoryMode) {
+			IsekaiConfig.MapSettings ms = IsekaiConfig.get().map;
+			if (!ms.showClaims) {
+				ms.showClaims = true;
+				IsekaiConfig.save();
+			}
+		}
+		UiSounds.toggle();
+	}
+
+	private void drawTerritory(GuiGraphics g, Rect r, int mx, int my, float partialTick) {
+		this.territory.layout(r);
+		boolean overPanel = this.territory.rect().grow(2).contains(mx, my);
+		if (r.contains(mx, my) && !overPanel) {
+			int cx = Mth.floor(MapRenderer.toWorldX(this.view, r, mx)) >> 4;
+			int cz = Mth.floor(MapRenderer.toWorldZ(this.view, r, my)) >> 4;
+			int x0 = MapRenderer.toScreenX(this.view, r, cx * 16.0);
+			int x1 = MapRenderer.toScreenX(this.view, r, cx * 16.0 + 16.0);
+			int y0 = MapRenderer.toScreenY(this.view, r, cz * 16.0);
+			int y1 = MapRenderer.toScreenY(this.view, r, cz * 16.0 + 16.0);
+			int color = this.territory.erasing() ? 0xFFE0465E : 0xFF000000 | Theme.landColor(this.territory.selected());
+			g.enableScissor(r.x(), r.y(), r.right(), r.bottom());
+			if (!this.territory.erasing()) Draw.fill(g, x0, y0, x1, y1, Draw.alpha(color, 0.35f));
+			Draw.fill(g, x0, y0, x1, y0 + 1, color);
+			Draw.fill(g, x0, y1 - 1, x1, y1, color);
+			Draw.fill(g, x0, y0, x0 + 1, y1, color);
+			Draw.fill(g, x1 - 1, y0, x1, y1, color);
+			g.disableScissor();
+		}
+		Draw.push(g);
+		Draw.layer(g, 100f);
+		this.territory.render(g, mx, my, partialTick);
+		Draw.pop(g);
+		Component tip = this.territory.takeTooltip();
+		if (tip != null) this.setTooltipForNextRenderPass(tip);
+	}
+
+	private void paintAt(double mx, double my) {
+		DimMap map = MapManager.current();
+		Rect r = current();
+		if (map == null || !r.contains(mx, my)) return;
+		String owner = this.paintErase ? null : this.territory.selected();
+		if (!this.paintErase && owner == null) return;
+		int cx = Mth.floor(MapRenderer.toWorldX(this.view, r, mx)) >> 4;
+		int cz = Mth.floor(MapRenderer.toWorldZ(this.view, r, my)) >> 4;
+		map.setClaim(cx, cz, owner);
+	}
+
+	private void paintLine(double x0, double y0, double x1, double y1) {
+		double dist = Math.hypot(x1 - x0, y1 - y0);
+		int steps = Math.max(1, (int) Math.ceil(dist / 3.0));
+		for (int i = 1; i <= steps; i++) paintAt(x0 + (x1 - x0) * i / steps, y0 + (y1 - y0) * i / steps);
+	}
+
+	/** Usado pelos testes automaticos: liga o modo territorio, cria/seleciona um reino e pinta chunks. */
+	public void debugPaintTerritory(String kingdom, int fromChunkX, int fromChunkZ, int toChunkX, int toChunkZ) {
+		if (!this.territoryMode) toggleTerritoryMode();
+		com.compelium.isekaiui.map.Kingdoms.add(kingdom);
+		this.territory.select(kingdom);
+		DimMap map = MapManager.current();
+		if (map == null) return;
+		for (int x = Math.min(fromChunkX, toChunkX); x <= Math.max(fromChunkX, toChunkX); x++) {
+			for (int z = Math.min(fromChunkZ, toChunkZ); z <= Math.max(fromChunkZ, toChunkZ); z++) map.setClaim(x, z, kingdom);
+		}
 	}
 
 	// ------------------------------------------------------------------ popups
@@ -547,7 +650,9 @@ public class IsekaiMapScreen extends Screen {
 			Draw.sprite(g, shareHover ? Theme.TAB : Theme.PILL, share.x(), share.y(), share.w(), share.h(), 1f);
 			Draw.sprite(g, Theme.icon("chat"), share.cx() - 5, share.cy() - 5, 10, 10, shareHover ? 0xFF3A2B17 : 0xFFE6CB82);
 			if (shareHover) this.setTooltipForNextRenderPass(Component.translatable("isekai_ui.map.share"));
-			Component coords = Component.literal("X " + this.editing.x + "   Y " + this.editing.y + "   Z " + this.editing.z);
+			Component coords = com.compelium.isekaiui.client.Instruments.showCoordinates()
+					? Component.literal("X " + this.editing.x + "   Y " + this.editing.y + "   Z " + this.editing.z)
+					: Component.translatable("isekai_ui.map.no_compass");
 			Draw.text(g, this.font, coords, pr.x() + 10, cy + 14 + 6, Theme.TEXT_DIM, false);
 			List<Rect> btns = popupButtons(this.editingNew ? 2 : 3);
 			drawTextButton(g, btns.get(0), Component.translatable("isekai_ui.popup.save"), btns.get(0).contains(mx, my));
@@ -694,6 +799,24 @@ public class IsekaiMapScreen extends Screen {
 				}
 			}
 		}
+		if (this.territoryMode && chromeAlpha() > 0.5f) {
+			if (this.territory.mouseClicked(mouseX, mouseY, button)) return true;
+			if (r.contains(mouseX, mouseY)) {
+				if (button == 2 || (button == 0 && hasShiftDown())) {
+					this.dragging = true;
+					return true;
+				}
+				if (button == 0 || button == 1) {
+					this.painting = true;
+					this.paintErase = button == 1 || this.territory.erasing();
+					this.lastPaintX = mouseX;
+					this.lastPaintY = mouseY;
+					paintAt(mouseX, mouseY);
+					UiSounds.hover();
+					return true;
+				}
+			}
+		}
 		if (button == 1 && r.contains(mouseX, mouseY) && chromeAlpha() > 0.5f) {
 			openContext(mouseX, mouseY);
 			return true;
@@ -707,7 +830,13 @@ public class IsekaiMapScreen extends Screen {
 
 	@Override
 	public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
-		if (this.dragging && button == 0 && this.closeNanos < 0L && this.popup == Popup.NONE) {
+		if (this.painting && this.closeNanos < 0L) {
+			paintLine(this.lastPaintX, this.lastPaintY, mouseX, mouseY);
+			this.lastPaintX = mouseX;
+			this.lastPaintY = mouseY;
+			return true;
+		}
+		if (this.dragging && (button == 0 || button == 2) && this.closeNanos < 0L && this.popup == Popup.NONE) {
 			this.view.cx -= dragX / this.view.zoom;
 			this.view.cz -= dragY / this.view.zoom;
 			this.follow = false;
@@ -719,12 +848,14 @@ public class IsekaiMapScreen extends Screen {
 	@Override
 	public boolean mouseReleased(double mouseX, double mouseY, int button) {
 		this.dragging = false;
+		this.painting = false;
 		return super.mouseReleased(mouseX, mouseY, button);
 	}
 
 	@Override
 	public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
 		if (this.closeNanos >= 0L || scrollY == 0 || this.popup != Popup.NONE) return true;
+		if (this.territoryMode && this.territory.mouseScrolled(mouseX, mouseY, scrollY)) return true;
 		Rect r = current();
 		float newZoom = Mth.clamp(this.view.zoom * (float) Math.pow(1.2, scrollY), MIN_ZOOM, MAX_ZOOM);
 		double offX = mouseX - (r.x() + r.w() / 2.0);
@@ -755,6 +886,31 @@ public class IsekaiMapScreen extends Screen {
 			}
 			return super.keyPressed(keyCode, scanCode, modifiers) || true;
 		}
+		if (this.territoryMode) {
+			if (this.territory.keyPressed(keyCode, scanCode, modifiers)) return true;
+			if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
+				toggleTerritoryMode();
+				return true;
+			}
+			double step = 24.0 / this.view.zoom;
+			if (keyCode == GLFW.GLFW_KEY_LEFT || keyCode == GLFW.GLFW_KEY_A) this.view.cx -= step;
+			else if (keyCode == GLFW.GLFW_KEY_RIGHT || keyCode == GLFW.GLFW_KEY_D) this.view.cx += step;
+			else if (keyCode == GLFW.GLFW_KEY_UP || keyCode == GLFW.GLFW_KEY_W) this.view.cz -= step;
+			else if (keyCode == GLFW.GLFW_KEY_DOWN || keyCode == GLFW.GLFW_KEY_S) this.view.cz += step;
+			else return keyPressedNormal(keyCode, scanCode, modifiers);
+			this.follow = false;
+			return true;
+		}
+		return keyPressedNormal(keyCode, scanCode, modifiers);
+	}
+
+	@Override
+	public boolean charTyped(char c, int modifiers) {
+		if (this.territoryMode && this.territory.charTyped(c, modifiers)) return true;
+		return super.charTyped(c, modifiers);
+	}
+
+	private boolean keyPressedNormal(int keyCode, int scanCode, int modifiers) {
 		if (IsekaiKeys.isMapKey(keyCode, scanCode)) {
 			onClose();
 			return true;

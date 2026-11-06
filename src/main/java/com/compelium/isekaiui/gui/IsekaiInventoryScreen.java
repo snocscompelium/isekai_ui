@@ -307,10 +307,13 @@ public class IsekaiInventoryScreen extends IsekaiMenuScreen<InventoryMenu> {
 		}
 		Component region = regionName();
 		p.title = region;
-		Panels.tab(g, this.font, p.now.x() + 4, p.now.y() - InventoryLayout.TAB, p.now.w() - 8, region, a);
-		BlockPos bp = pl.blockPosition();
-		Component coords = Component.literal("X " + bp.getX() + "   Y " + bp.getY() + "   Z " + bp.getZ());
-		Draw.textCentered(g, this.font, coords, p.now.cx(), p.now.bottom() + 3, Draw.alpha(Theme.TEXT_DIM, a), true);
+		Panels.tab(g, this.font, p.now.x() + 4, p.now.y() - InventoryLayout.TAB, p.now.w() - 30, region, a);
+		SkyDial.draw(g, this.font, p.now.right() - 9, p.now.y() + 1, a);
+		if (com.compelium.isekaiui.client.Instruments.showCoordinates()) {
+			BlockPos bp = pl.blockPosition();
+			Component coords = Component.literal("X " + bp.getX() + "   Y " + bp.getY() + "   Z " + bp.getZ());
+			Draw.textCentered(g, this.font, coords, p.now.cx(), p.now.bottom() + 3, Draw.alpha(Theme.TEXT_DIM, a), true);
+		}
 	}
 
 	private Rect buttonRect(Rect barRect, int i) {

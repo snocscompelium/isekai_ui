@@ -38,6 +38,8 @@ public final class IsekaiUI implements ClientModInitializer {
 		ReturnToContainer.init();
 		TooltipComponentCallback.EVENT.register(data -> data instanceof BackpackPreview preview ? new ClientBackpackTooltip(preview) : null);
 		ClientTickEvents.END_CLIENT_TICK.register(IsekaiKeys::tick);
+		ClientTickEvents.END_CLIENT_TICK.register(com.compelium.isekaiui.client.Instruments::tick);
+		net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback.EVENT.register(com.compelium.isekaiui.client.HudOverlay::render);
 		LOG.info("Compelium's Isekai UI pronto.");
 	}
 }

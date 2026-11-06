@@ -63,22 +63,34 @@ public final class LandsTracker {
 
 	/** Nome do terreno onde o jogador esta (ou null se nao souber / area sem dono). */
 	public static String currentLand() {
+		if (!IsekaiConfig.get().lands.autoDetect) {
+			// territorios marcados a mao: o dono e o do chunk onde o jogador esta
+			Minecraft mc = Minecraft.getInstance();
+			com.compelium.isekaiui.map.DimMap map = com.compelium.isekaiui.map.MapManager.current();
+			if (map == null || mc.player == null) return null;
+			return map.claim(mc.player.chunkPosition().x, mc.player.chunkPosition().z);
+		}
 		return state == State.IN_LAND ? land : null;
+	}
+
+	private static boolean auto() {
+		IsekaiConfig.LandsSettings cfg = IsekaiConfig.get().lands;
+		return cfg.enabled && cfg.autoDetect;
 	}
 
 	public static void onTitle(Component c) {
 		IsekaiConfig.LandsSettings cfg = IsekaiConfig.get().lands;
-		if (cfg.enabled && cfg.readTitle) handle(c, "titulo");
+		if (auto() && cfg.readTitle) handle(c, "titulo");
 	}
 
 	public static void onSubtitle(Component c) {
 		IsekaiConfig.LandsSettings cfg = IsekaiConfig.get().lands;
-		if (cfg.enabled && cfg.readSubtitle) handle(c, "subtitulo");
+		if (auto() && cfg.readSubtitle) handle(c, "subtitulo");
 	}
 
 	public static void onActionBar(Component c) {
 		IsekaiConfig.LandsSettings cfg = IsekaiConfig.get().lands;
-		if (cfg.enabled && cfg.readActionBar) handle(c, "actionbar");
+		if (auto() && cfg.readActionBar) handle(c, "actionbar");
 	}
 
 	private static void handle(Component c, String source) {
@@ -121,7 +133,7 @@ public final class LandsTracker {
 
 	/** Chamado todo tick: pinta o chunk atual com o dono conhecido. */
 	public static void tick(Minecraft mc, DimMap map) {
-		if (map == null || mc.player == null || !IsekaiConfig.get().lands.enabled) return;
+		if (map == null || mc.player == null || !auto()) return;
 		int cx = mc.player.chunkPosition().x;
 		int cz = mc.player.chunkPosition().z;
 		if (state == State.IN_LAND && land != null) {
