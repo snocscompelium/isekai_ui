@@ -1,0 +1,18 @@
+{
+	"required": true,
+	"minVersion": "0.8",
+	"package": "com.compelium.isekaiui.mixin",
+	"compatibilityLevel": "JAVA_21",
+	"client": [
+		"CameraMixin",
+		"EntityRendererMixin",
+		"EntityRenderStateMixin",
+		"GuiMixin",
+		"HumanoidModelMixin",
+		"MinecraftMixin",
+		"SlotAccessor"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}

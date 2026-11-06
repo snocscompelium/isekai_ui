@@ -1,0 +1,19 @@
+{
+	"key.categories.isekai_ui": "Isekai UI",
+	"key.isekai_ui.map": "Abrir mapa",
+	"isekai_ui.inventory.title": "Inventário",
+	"isekai_ui.panel.inventory": "Inventário",
+	"isekai_ui.panel.crafting": "Síntese",
+	"isekai_ui.map.title": "Mapa",
+	"isekai_ui.map.open_hint": "Abrir o mapa [%s]",
+	"isekai_ui.map.unknown_region": "Terras desconhecidas",
+	"isekai_ui.map.claim": "Terreno: %s",
+	"isekai_ui.button.map": "Mapa [%s]",
+	"isekai_ui.button.camera.third": "Câmera: terceira pessoa (F5 alterna)",
+	"isekai_ui.button.camera.first": "Câmera: primeira pessoa (F5 alterna)",
+	"isekai_ui.button.back": "Voltar ao inventário [E]",
+	"isekai_ui.button.center": "Seguir meu personagem",
+	"isekai_ui.button.entities": "Mostrar criaturas",
+	"isekai_ui.button.claims": "Mostrar terrenos",
+	"isekai_ui.button.grid": "Mostrar grade"
+}

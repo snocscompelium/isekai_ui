@@ -1,0 +1,31 @@
+{
+	"schemaVersion": 1,
+	"id": "isekai_ui",
+	"version": "${version}",
+	"name": "Compelium's Isekai UI",
+	"description": "Inventario e mapa no estilo janela de status de isekai: camera em terceira pessoa, janelas flutuantes animadas, mapa de pergaminho com nevoa e terrenos do Lands. Apenas no cliente.",
+	"authors": [
+		"snocs (Compelium)"
+	],
+	"contact": {
+		"sources": "https://github.com/snocscompelium/isekai_ui",
+		"issues": "https://github.com/snocscompelium/isekai_ui/issues"
+	},
+	"license": "All-Rights-Reserved",
+	"icon": "assets/isekai_ui/icon.png",
+	"environment": "client",
+	"entrypoints": {
+		"client": [
+			"com.compelium.isekaiui.IsekaiUI"
+		]
+	},
+	"mixins": [
+		"isekai_ui.mixins.json"
+	],
+	"depends": {
+		"fabricloader": ">=0.16.9",
+		"minecraft": "1.21.4",
+		"java": ">=21",
+		"fabric-api": "*"
+	}
+}

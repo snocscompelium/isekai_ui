@@ -1,0 +1,17 @@
+# Classes do Minecraft cujas assinaturas o CI imprime (para conferir a API exata da versao)
+net.minecraft.client.gui.GuiGraphics
+net.minecraft.client.gui.screens.inventory.AbstractContainerScreen
+net.minecraft.client.gui.screens.Screen
+net.minecraft.client.Camera
+net.minecraft.client.model.HumanoidModel
+net.minecraft.client.model.geom.ModelPart
+net.minecraft.client.renderer.entity.EntityRenderer
+net.minecraft.client.renderer.entity.state.ArmedEntityRenderState
+net.minecraft.client.renderer.item.ItemStackRenderState
+net.minecraft.client.gui.Gui
+net.minecraft.client.renderer.texture.DynamicTexture
+com.mojang.blaze3d.platform.NativeImage
+net.minecraft.client.renderer.texture.TextureManager
+net.minecraft.world.level.LevelHeightAccessor
+net.minecraft.client.multiplayer.ClientChunkCache
+net.minecraft.client.Options

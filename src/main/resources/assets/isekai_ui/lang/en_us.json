@@ -1,0 +1,19 @@
+{
+	"key.categories.isekai_ui": "Isekai UI",
+	"key.isekai_ui.map": "Open map",
+	"isekai_ui.inventory.title": "Inventory",
+	"isekai_ui.panel.inventory": "Inventory",
+	"isekai_ui.panel.crafting": "Synthesis",
+	"isekai_ui.map.title": "Map",
+	"isekai_ui.map.open_hint": "Open the map [%s]",
+	"isekai_ui.map.unknown_region": "Uncharted lands",
+	"isekai_ui.map.claim": "Land: %s",
+	"isekai_ui.button.map": "Map [%s]",
+	"isekai_ui.button.camera.third": "Camera: third person (F5 switches)",
+	"isekai_ui.button.camera.first": "Camera: first person (F5 switches)",
+	"isekai_ui.button.back": "Back to inventory [E]",
+	"isekai_ui.button.center": "Follow me",
+	"isekai_ui.button.entities": "Show creatures",
+	"isekai_ui.button.claims": "Show lands",
+	"isekai_ui.button.grid": "Show grid"
+}

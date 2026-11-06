@@ -1,0 +1,15 @@
+{
+	"schemaVersion": 1,
+	"id": "isekai_ui_test",
+	"version": "1.0.0",
+	"name": "Compelium's Isekai UI - testes",
+	"environment": "client",
+	"entrypoints": {
+		"fabric-client-gametest": [
+			"com.compelium.isekaiui.test.IsekaiClientGameTest"
+		]
+	},
+	"depends": {
+		"isekai_ui": "*"
+	}
+}
