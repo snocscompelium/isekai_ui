@@ -77,6 +77,13 @@ public class IsekaiInventoryScreen extends IsekaiMenuScreen<InventoryMenu> {
 	}
 
 	@Override
+	protected void onOpened() {
+		// a gaveta "..." sempre comeca fechada
+		ButtonBar.drawerOpen = false;
+		super.onOpened();
+	}
+
+	@Override
 	protected boolean screenFits() {
 		return super.screenFits() && this.menu.slots.size() >= 46;
 	}

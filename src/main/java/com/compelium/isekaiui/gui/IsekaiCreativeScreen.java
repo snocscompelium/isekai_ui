@@ -145,6 +145,13 @@ public class IsekaiCreativeScreen extends IsekaiMenuScreen<InventoryMenu> {
 		return "creative";
 	}
 
+	@Override
+	protected void onOpened() {
+		// a gaveta "..." sempre comeca fechada
+		ButtonBar.drawerOpen = false;
+		super.onOpened();
+	}
+
 	private static int libWidth(int cols) {
 		return 9 + cols * SLOT + 4 + 4 + 9;
 	}

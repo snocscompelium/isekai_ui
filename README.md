@@ -22,7 +22,8 @@ Não precisa instalar nada no servidor e quem não tiver o mod joga normalmente.
 - **Bússola e relógio de verdade**:
   - sem relógio, o medalhão do minimapa mostra só o sol (que vira lua à noite); com um **relógio** no inventário
     (ou dentro de uma shulker/sacola) ele mostra a hora;
-  - com uma **bússola** você vê as coordenadas e o minimapa aparece no canto da tela mesmo com o inventário fechado;
+  - com uma **bússola** você vê as coordenadas e o minimapa aparece na tela mesmo com o inventário fechado
+    (em qualquer canto ou **arrastado** para onde quiser, no tamanho que quiser: Configurações → Bússola e relógio);
   - **segurando** a bússola, os marcadores aparecem no horizonte, com nome e distância.
 - **Conjuntos de armadura** (botão da camiseta na barra): salve a armadura vestida e troque de conjunto com um
   clique. No sobrevivência as peças vêm da bolsa (uma de cada vez, como uma pessoa faria); no criativo são cópias.
@@ -31,7 +32,17 @@ Não precisa instalar nada no servidor e quem não tiver o mod joga normalmente.
 - **Criativo isekai**: catálogo com categorias e busca, e o **Baú pessoal** — cópias de itens (inclusive os
   personalizados do servidor) salvas no seu computador, separadas em **abas** com nome e ícone
   (botão direito numa aba edita; **+** cria outra; Shift+clique num item da bolsa guarda uma cópia).
+  A **lixeira** apaga o item da mão; **Shift + clique duas vezes** nela limpa a bolsa e a barra (a armadura fica).
 - **Comandos rápidos**: comandos que abrem menus são aprendidos sozinhos; dá para anotar outros e fixar na barra.
+- **Grimório de receitas** (botão do livro na barra e ao lado da bancada, fornalhas, suporte de poções, ferraria e
+  cortador): só anota receitas que **funcionaram de verdade** — o resultado precisa aparecer na estação. As receitas
+  que o servidor manda para o livro do jogo ficam escondidas; dá para mostrá-las com **?** e testar: as que funcionam
+  viram receitas anotadas e as falsas somem. **Colocar** põe os ingredientes da bolsa na estação (pelo pedido normal do
+  jogo quando o servidor conhece a receita; senão clicando item por item, com calma).
+- **Barra de botões compacta**: quando há muitos botões, os últimos vão para o botão **...**; a ordem, o limite e
+  quais aparecem se escolhem nas configurações. A **engrenagem** abre as configurações (também pelo Mod Menu).
+- **Roupas (CPM)**: se o Customizable Player Models estiver instalado, o botão do cabide abre o menu dele.
+- **Sons**: volumes separados para abrir/fechar janelas e para cliques.
 
 ## Instalação
 
@@ -40,18 +51,24 @@ Não precisa instalar nada no servidor e quem não tiver o mod joga normalmente.
 
 ## Configuração
 
-Arquivo `config/isekai_ui.json` (criado na primeira vez que o jogo abre):
+Quase tudo se ajusta na tela de **Configurações** (engrenagem na barra do inventário ou Mod Menu).
+Também dá para editar o arquivo `config/isekai_ui.json` (criado na primeira vez que o jogo abre):
 
 - `thirdPersonCamera`, `characterScreenX`, `cameraDistance`: enquadramento da câmera.
 - `map.exploreRadiusChunks`: raio revelado ao redor do jogador.
 - `instruments`: `requireClock` / `requireCompass` (false = sempre mostrar hora / coordenadas),
-  `hudMinimap`, `hudCorner` (`top_left`, `top_right`, `bottom_left`, `bottom_right`), `hudSize`, `horizonMarkers`.
+  `hudMinimap`, `hudCorner` (`top_left`, `top_right`, `bottom_left`, `bottom_right`), `hudX`/`hudY` (posição
+  arrastada, -1 = usar o canto), `hudSize`, `horizonMarkers`.
+- `bar`: `maxVisible` (botões antes do "..."), `order` e `hidden` (ids: map, camera, commands, armor, grimoire, chest,
+  cpm, classic, trash, settings, `pin:<comando>`, `cfg:<número>`).
+- `recipes`: `showUntested` (mostrar receitas do servidor sem testar), `notifyLearned` (aviso de receita nova).
+- `uiSoundVolume`, `windowSoundVolume`, `clickSoundVolume`: volumes (0 a 1).
 - `lands`: `autoDetect` liga a leitura automática dos títulos do Lands; `debug` mostra no chat cada título recebido.
 - `menuButtons`: atalhos de comando na barra hexagonal, por exemplo
   `{"label": "Habilidades", "command": "skills", "icon": "star"}`.
 
-Os mapas, marcadores, reinos, o baú pessoal e os conjuntos de armadura ficam em `.minecraft/isekai_ui/maps/`
-(uma pasta por servidor).
+Os mapas, marcadores, reinos, o baú pessoal, os conjuntos de armadura e o grimório (`receitas.nbt`) ficam em
+`.minecraft/isekai_ui/maps/` (uma pasta por servidor).
 
 ## Texturas
 
