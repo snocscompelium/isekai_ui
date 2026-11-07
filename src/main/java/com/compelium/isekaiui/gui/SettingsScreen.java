@@ -407,6 +407,11 @@ public class SettingsScreen extends Screen {
 		this.minecraft.setScreen(this.parent);
 	}
 
+	/** Usado pelos testes automaticos: abre uma das abas da esquerda. */
+	public void debugSelect(int c) {
+		select(Math.max(0, Math.min(this.categories.size() - 1, c)));
+	}
+
 	@Override
 	public boolean isPauseScreen() {
 		return false;

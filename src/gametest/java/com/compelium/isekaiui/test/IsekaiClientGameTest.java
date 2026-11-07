@@ -21,6 +21,13 @@ import com.compelium.isekaiui.gui.IsekaiChestScreen;
 import com.compelium.isekaiui.gui.IsekaiInventoryScreen;
 import com.compelium.isekaiui.gui.IsekaiMapScreen;
 import com.compelium.isekaiui.gui.Rect;
+import com.compelium.isekaiui.gui.HudLayoutScreen;
+import com.compelium.isekaiui.gui.IsekaiMenuScreen;
+import com.compelium.isekaiui.gui.RecipeBookPanel;
+import com.compelium.isekaiui.gui.SettingsScreen;
+import com.compelium.isekaiui.config.IsekaiConfig;
+import com.compelium.isekaiui.recipes.RecipeJournal;
+import com.compelium.isekaiui.recipes.RecipePlacer;
 import com.compelium.isekaiui.map.DimMap;
 import com.compelium.isekaiui.map.Emblems;
 import com.compelium.isekaiui.map.MapManager;
@@ -302,7 +309,7 @@ public class IsekaiClientGameTest implements FabricClientGameTest {
 			ctx.getInput().setCursorPos(bundleInv[0], bundleInv[1]);
 			ctx.waitTicks(4);
 			ctx.takeScreenshot("isekai-17-inventario-sacola");
-			Rect listButton = ctx.computeOnClient(mc -> ((IsekaiInventoryScreen) mc.screen).debugButtonRect("list"));
+			Rect listButton = ctx.computeOnClient(mc -> ((IsekaiInventoryScreen) mc.screen).debugButtonRect("commands"));
 			click(ctx, listButton, scale);
 			ctx.waitTicks(15);
 			ctx.takeScreenshot("isekai-18-comandos-rapidos");
@@ -310,10 +317,15 @@ public class IsekaiClientGameTest implements FabricClientGameTest {
 			click(ctx, pin, scale);
 			ctx.waitTicks(15);
 			ctx.takeScreenshot("isekai-19-comando-fixado");
+			boolean pinnedOnBar = ctx.computeOnClient(mc -> {
+				IsekaiInventoryScreen inv = (IsekaiInventoryScreen) mc.screen;
+				return inv.debugButtonRect("pin:pets") != null || inv.debugInDrawer("pin:pets");
+			});
 			int buttons = ctx.computeOnClient(mc -> ((IsekaiInventoryScreen) mc.screen).debugButtonCount());
-			if (buttons != 5) throw new AssertionError("O comando fixado nao apareceu na barra (botoes: " + buttons + ")");
+			System.out.println("[isekai-test] botoes na barra: " + buttons);
+			if (!pinnedOnBar) throw new AssertionError("O comando fixado nao apareceu na barra (botoes: " + buttons + ")");
 			// fecha a lista e o inventario
-			Rect listAgain = ctx.computeOnClient(mc -> ((IsekaiInventoryScreen) mc.screen).debugButtonRect("list"));
+			Rect listAgain = ctx.computeOnClient(mc -> ((IsekaiInventoryScreen) mc.screen).debugButtonRect("commands"));
 			click(ctx, listAgain, scale);
 			ctx.waitTicks(5);
 			ctx.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
@@ -439,7 +451,7 @@ public class IsekaiClientGameTest implements FabricClientGameTest {
 			// comando anotado a mao na lista de comandos rapidos
 			ctx.getInput().pressKey(options -> options.keyInventory);
 			ctx.waitTicks(40);
-			Rect listBtn = ctx.computeOnClient(mc -> ((IsekaiInventoryScreen) mc.screen).debugButtonRect("list"));
+			Rect listBtn = ctx.computeOnClient(mc -> ((IsekaiInventoryScreen) mc.screen).debugButtonRect("commands"));
 			click(ctx, listBtn, scale);
 			ctx.waitTicks(10);
 			ctx.runOnClient(mc -> ((IsekaiInventoryScreen) mc.screen).debugAddCommand("/tp @s 0 100 0"));
@@ -447,7 +459,7 @@ public class IsekaiClientGameTest implements FabricClientGameTest {
 			ctx.takeScreenshot("isekai-53-comando-anotado");
 			boolean noted = ctx.computeOnClient(mc -> CommandMemory.entries().stream().anyMatch(e -> e.command.equals("tp @s 0 100 0")));
 			if (!noted) throw new AssertionError("O comando anotado nao entrou na lista");
-			Rect listBtn2 = ctx.computeOnClient(mc -> ((IsekaiInventoryScreen) mc.screen).debugButtonRect("list"));
+			Rect listBtn2 = ctx.computeOnClient(mc -> ((IsekaiInventoryScreen) mc.screen).debugButtonRect("commands"));
 			click(ctx, listBtn2, scale);
 			ctx.waitTicks(5);
 			ctx.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
@@ -665,6 +677,9 @@ public class IsekaiClientGameTest implements FabricClientGameTest {
 			ctx.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
 			ctx.waitTicks(20);
 
+			// ================================================================== v0.5
+			testV05(ctx, server, scale);
+
 			// tela maior (1080p, escala 4)
 			ctx.getInput().resizeWindow(1920, 1080);
 			ctx.runOnClient(mc -> {
@@ -682,7 +697,234 @@ public class IsekaiClientGameTest implements FabricClientGameTest {
 			ctx.takeScreenshot("isekai-31-bau-1080p");
 			ctx.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
 			ctx.waitTicks(20);
+			// grimorio ao lado da mesa de trabalho (em 1080p cabe ao lado)
+			openStation(ctx, -2, 2, IsekaiCraftingScreen.class, "mesa de trabalho 1080p");
+			ctx.runOnClient(mc -> ((IsekaiCraftingScreen) mc.screen).debugGrimoire());
+			ctx.waitTicks(20);
+			ctx.takeScreenshot("isekai-32-grimorio-ao-lado-1080p");
+			boolean beside = ctx.computeOnClient(mc -> {
+				IsekaiCraftingScreen cs = (IsekaiCraftingScreen) mc.screen;
+				Rect g = cs.debugPanelRect("grimoire");
+				Rect st = cs.debugPanelRect("station");
+				return g != null && st != null && g.right() <= st.x();
+			});
+			System.out.println("[isekai-test] grimorio ao lado da mesa em 1080p: " + beside);
+			closeStation(ctx);
+
+			// criativo: Shift + clique duas vezes na lixeira limpa a bolsa e a barra (armadura fica)
+			server.runCommand("gamemode creative @a");
+			ctx.waitTicks(10);
+			ctx.getInput().pressKey(options -> options.keyInventory);
+			ctx.waitTicks(40);
+			assertScreen(ctx, IsekaiCreativeScreen.class, "criativo para a lixeira");
+			int itemsBefore = itemsOnServer(server);
+			ctx.runOnClient(mc -> ((IsekaiCreativeScreen) mc.screen).debugTrash(true));
+			ctx.waitTicks(5);
+			ctx.takeScreenshot("isekai-90-lixeira-armada");
+			int itemsArmed = itemsOnServer(server);
+			if (itemsArmed != itemsBefore) throw new AssertionError("O primeiro Shift+clique na lixeira ja apagou itens");
+			ctx.runOnClient(mc -> ((IsekaiCreativeScreen) mc.screen).debugTrash(true));
+			ctx.waitTicks(15);
+			ctx.takeScreenshot("isekai-91-criativo-limpo");
+			int itemsAfter = itemsOnServer(server);
+			String headAfter = wornOnServer(server, EquipmentSlot.HEAD);
+			System.out.println("[isekai-test] lixeira: antes=" + itemsBefore + " depois=" + itemsAfter + " cabeca=" + headAfter);
+			if (itemsBefore == 0 || itemsAfter != 0) throw new AssertionError("A lixeira nao limpou a bolsa e a barra (" + itemsBefore + " -> " + itemsAfter + ")");
+			if (headAfter.equals("minecraft:air")) throw new AssertionError("A lixeira nao devia tirar a armadura");
+			ctx.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
+			ctx.waitTicks(20);
 		}
+	}
+
+	/** Quantos itens o jogador tem na bolsa e na barra, segundo o servidor. */
+	private static int itemsOnServer(TestServerContext server) {
+		return server.computeOnServer(s -> {
+			int n = 0;
+			for (net.minecraft.world.item.ItemStack st : s.getPlayerList().getPlayers().get(0).getInventory().items) if (!st.isEmpty()) n++;
+			return n;
+		});
+	}
+
+	/** v0.5: conjuntos crescendo na hora, grimorio, barra compacta, configuracoes e minimapa movel. */
+	private static void testV05(ClientGameTestContext ctx, TestServerContext server, double scale) {
+		// conjunto novo: a janela cresce na hora (antes so crescia depois de fechar e abrir)
+		ctx.getInput().pressKey(options -> options.keyInventory);
+		ctx.waitTicks(40);
+		assertScreen(ctx, IsekaiInventoryScreen.class, "inventario v0.5");
+		click(ctx, ctx.computeOnClient(mc -> ((IsekaiInventoryScreen) mc.screen).debugButtonRect("armor")), scale);
+		ctx.waitTicks(15);
+		int armorBefore = panelRect(ctx, "armor_sets").h();
+		ctx.runOnClient(mc -> ((IsekaiInventoryScreen) mc.screen).debugSaveArmorSet());
+		ctx.waitTicks(10);
+		int armorAfter = panelRect(ctx, "armor_sets").h();
+		ctx.takeScreenshot("isekai-70-conjunto-novo-janela-cresceu");
+		System.out.println("[isekai-test] janela de conjuntos: " + armorBefore + " -> " + armorAfter);
+		if (armorAfter <= armorBefore) throw new AssertionError("A janela de conjuntos nao cresceu ao salvar um conjunto (" + armorBefore + " -> " + armorAfter + ")");
+		click(ctx, ctx.computeOnClient(mc -> ((IsekaiInventoryScreen) mc.screen).debugButtonRect("armor")), scale);
+		ctx.waitTicks(5);
+
+		// grimorio: o que ja foi aprendido sozinho ate aqui (so com resultados de verdade)
+		String learnedSoFar = ctx.computeOnClient(mc -> {
+			StringBuilder sb = new StringBuilder();
+			for (RecipeJournal.Entry e : RecipeJournal.all()) sb.append(e.station).append(':').append(BuiltInRegistries.ITEM.getKey(e.result.getItem())).append('x').append(e.result.getCount()).append(' ');
+			return sb.toString();
+		});
+		System.out.println("[isekai-test] grimorio antes do teste: " + learnedSoFar);
+		// do zero: 1 tronco na grade 2x2 -> o servidor mostra 4 tabuas -> a receita e anotada
+		ctx.runOnClient(mc -> RecipeJournal.debugForgetAll());
+		ctx.runOnClient(mc -> {
+			int id = mc.player.containerMenu.containerId;
+			int logs = findSlot(mc, "minecraft:oak_log");
+			mc.gameMode.handleInventoryMouseClick(id, logs, 0, ClickType.PICKUP, mc.player);
+			mc.gameMode.handleInventoryMouseClick(id, 1, 1, ClickType.PICKUP, mc.player);
+			mc.gameMode.handleInventoryMouseClick(id, logs, 0, ClickType.PICKUP, mc.player);
+		});
+		ctx.waitTicks(20);
+		ctx.takeScreenshot("isekai-71-receita-anotada");
+		String learned = ctx.computeOnClient(mc -> {
+			if (RecipeJournal.size() != 1) return "receitas=" + RecipeJournal.size();
+			RecipeJournal.Entry e = RecipeJournal.all().get(0);
+			return e.station + ":" + BuiltInRegistries.ITEM.getKey(e.result.getItem()) + "x" + e.result.getCount() + " " + e.w + "x" + e.h;
+		});
+		System.out.println("[isekai-test] receita anotada: " + learned);
+		if (!learned.equals("CRAFTING:minecraft:oak_planksx4 1x1")) throw new AssertionError("A receita das tabuas nao foi anotada: " + learned);
+		// tira o tronco da grade e coloca de novo pelo grimorio
+		quickMove(ctx, 1);
+		ctx.waitTicks(5);
+		ctx.runOnClient(mc -> ((IsekaiInventoryScreen) mc.screen).debugGrimoire());
+		ctx.waitTicks(20);
+		ctx.takeScreenshot("isekai-72-grimorio");
+		String placed = ctx.computeOnClient(mc -> ((IsekaiInventoryScreen) mc.screen).debugGrimoire().debugPlace(0).getString());
+		ctx.waitTicks(20);
+		String gridNow = ctx.computeOnClient(mc -> BuiltInRegistries.ITEM.getKey(mc.player.containerMenu.getSlot(1).getItem().getItem())
+				+ " -> " + BuiltInRegistries.ITEM.getKey(mc.player.containerMenu.getSlot(0).getItem().getItem()));
+		System.out.println("[isekai-test] grimorio colocou (" + placed + "): " + gridNow);
+		ctx.takeScreenshot("isekai-73-grimorio-colocou");
+		if (!gridNow.contains("oak_planks")) throw new AssertionError("O grimorio nao colocou a receita na grade: " + gridNow);
+		// receitas do servidor sem testar (com "?")
+		ctx.runOnClient(mc -> IsekaiConfig.get().recipes.showUntested = true);
+		ctx.waitTicks(10);
+		ctx.takeScreenshot("isekai-74-grimorio-receitas-do-servidor");
+		int shownWithServer = ctx.computeOnClient(mc -> ((IsekaiInventoryScreen) mc.screen).debugGrimoire().debugViewCount());
+		System.out.println("[isekai-test] grimorio com receitas do servidor: " + shownWithServer);
+		ctx.runOnClient(mc -> IsekaiConfig.get().recipes.showUntested = false);
+		// fecha o grimorio pelo botao da barra e sai
+		click(ctx, ctx.computeOnClient(mc -> ((IsekaiInventoryScreen) mc.screen).debugButtonRect("grimoire")), scale);
+		ctx.waitTicks(5);
+		ctx.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
+		ctx.waitTicks(25);
+
+		// mesa de trabalho: grimorio por cima da bolsa (tela pequena) e colocando item por item (cliques com calma)
+		openStation(ctx, -2, 2, IsekaiCraftingScreen.class, "mesa de trabalho com grimorio");
+		ctx.runOnClient(mc -> {
+			RecipePlacer.debugManualOnly = true;
+			((IsekaiCraftingScreen) mc.screen).debugGrimoire();
+		});
+		ctx.waitTicks(20);
+		String manual = ctx.computeOnClient(mc -> ((IsekaiCraftingScreen) mc.screen).debugGrimoire().debugPlace(0).getString());
+		ctx.waitTicks(30);
+		ctx.runOnClient(mc -> RecipePlacer.debugManualOnly = false);
+		String tableNow = ctx.computeOnClient(mc -> BuiltInRegistries.ITEM.getKey(mc.player.containerMenu.getSlot(1).getItem().getItem())
+				+ " -> " + BuiltInRegistries.ITEM.getKey(mc.player.containerMenu.getSlot(0).getItem().getItem()));
+		System.out.println("[isekai-test] mesa, colocando um por um (" + manual + "): " + tableNow);
+		ctx.takeScreenshot("isekai-75-mesa-com-grimorio");
+		if (!tableNow.contains("oak_planks")) throw new AssertionError("Os cliques do grimorio nao montaram a receita na mesa: " + tableNow);
+		closeStation(ctx);
+		// fornalha e suporte de pocoes tambem tem o grimorio
+		openStation(ctx, -1, 2, IsekaiFurnaceScreen.class, "fornalha com grimorio");
+		ctx.waitTicks(10);
+		ctx.takeScreenshot("isekai-76-fornalha-com-grimorio");
+		closeStation(ctx);
+
+		// barra compacta: com limite de 4, os outros botoes vao para a gaveta "..."
+		ctx.runOnClient(mc -> IsekaiConfig.get().bar.maxVisible = 4);
+		ctx.getInput().pressKey(options -> options.keyInventory);
+		ctx.waitTicks(40);
+		assertScreen(ctx, IsekaiInventoryScreen.class, "inventario com barra compacta");
+		ctx.takeScreenshot("isekai-77-barra-compacta");
+		boolean armorInDrawer = ctx.computeOnClient(mc -> ((IsekaiInventoryScreen) mc.screen).debugInDrawer("armor"));
+		boolean gearOnBar = ctx.computeOnClient(mc -> ((IsekaiInventoryScreen) mc.screen).debugButtonRect("settings") != null);
+		if (!armorInDrawer || !gearOnBar) throw new AssertionError("Barra compacta errada: armadura na gaveta=" + armorInDrawer + " engrenagem na barra=" + gearOnBar);
+		click(ctx, ctx.computeOnClient(mc -> ((IsekaiInventoryScreen) mc.screen).debugButtonRect("more")), scale);
+		ctx.waitTicks(12);
+		ctx.takeScreenshot("isekai-78-gaveta-aberta");
+		click(ctx, ctx.computeOnClient(mc -> ((IsekaiInventoryScreen) mc.screen).debugButtonRect("armor")), scale);
+		ctx.waitTicks(15);
+		boolean armorOpened = ctx.computeOnClient(mc -> ((IsekaiInventoryScreen) mc.screen).debugPanelVisible("armor_sets")
+				&& !((IsekaiInventoryScreen) mc.screen).debugPanelVisible("bar_drawer"));
+		ctx.takeScreenshot("isekai-79-botao-da-gaveta");
+		if (!armorOpened) throw new AssertionError("O botao da gaveta nao abriu os conjuntos");
+		click(ctx, ctx.computeOnClient(mc -> ((IsekaiInventoryScreen) mc.screen).debugButtonRect("more")), scale);
+		ctx.waitTicks(5);
+		click(ctx, ctx.computeOnClient(mc -> ((IsekaiInventoryScreen) mc.screen).debugButtonRect("armor")), scale);
+		ctx.waitTicks(5);
+		ctx.runOnClient(mc -> IsekaiConfig.get().bar.maxVisible = 8);
+
+		// engrenagem: configuracoes do mod
+		click(ctx, ctx.computeOnClient(mc -> ((IsekaiInventoryScreen) mc.screen).debugButtonRect("settings")), scale);
+		ctx.waitTicks(15);
+		assertScreen(ctx, SettingsScreen.class, "configuracoes pela engrenagem");
+		ctx.takeScreenshot("isekai-80-configuracoes");
+		ctx.runOnClient(mc -> ((SettingsScreen) mc.screen).debugSelect(1));
+		ctx.waitTicks(5);
+		ctx.takeScreenshot("isekai-81-configuracoes-sons");
+		ctx.runOnClient(mc -> ((SettingsScreen) mc.screen).debugSelect(4));
+		ctx.waitTicks(5);
+		ctx.takeScreenshot("isekai-82-configuracoes-barra");
+		ctx.runOnClient(mc -> ((SettingsScreen) mc.screen).debugSelect(5));
+		ctx.waitTicks(5);
+		ctx.takeScreenshot("isekai-83-configuracoes-grimorio");
+		ctx.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
+		ctx.waitTicks(40);
+		assertScreen(ctx, IsekaiInventoryScreen.class, "de volta das configuracoes");
+		ctx.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
+		ctx.waitTicks(25);
+
+		// minimapa da tela (com bussola) em outro lugar, e a tela de arrastar
+		ctx.runOnClient(mc -> {
+			IsekaiConfig.InstrumentSettings c = IsekaiConfig.get().instruments;
+			c.hudX = 0.86f;
+			c.hudY = 0.62f;
+			c.hudSize = 96;
+		});
+		ctx.waitTicks(10);
+		ctx.takeScreenshot("isekai-84-minimapa-movido");
+		ctx.runOnClient(mc -> mc.setScreen(new HudLayoutScreen(null)));
+		ctx.waitTicks(10);
+		ctx.takeScreenshot("isekai-85-arrastar-minimapa");
+		Rect hud = ctx.computeOnClient(mc -> com.compelium.isekaiui.client.HudOverlay.minimapRect(mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight()));
+		ctx.getInput().setCursorPos(hud.cx() * scale, hud.cy() * scale);
+		ctx.waitTicks(2);
+		ctx.getInput().holdMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
+		ctx.waitTicks(1);
+		for (int i = 0; i < 4; i++) {
+			ctx.getInput().moveCursor(-40 * scale, -15 * scale);
+			ctx.waitTicks(1);
+		}
+		ctx.getInput().releaseMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
+		ctx.waitTicks(3);
+		Rect hudMoved = ctx.computeOnClient(mc -> com.compelium.isekaiui.client.HudOverlay.minimapRect(mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight()));
+		ctx.takeScreenshot("isekai-86-minimapa-arrastado");
+		System.out.println("[isekai-test] minimapa: " + hud + " -> " + hudMoved);
+		if (hudMoved.x() >= hud.x()) throw new AssertionError("Arrastar o minimapa nao funcionou: " + hud + " -> " + hudMoved);
+		ctx.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
+		ctx.waitTicks(10);
+		ctx.runOnClient(mc -> {
+			IsekaiConfig.InstrumentSettings c = IsekaiConfig.get().instruments;
+			c.hudX = -1f;
+			c.hudY = -1f;
+			c.hudSize = 84;
+		});
+	}
+
+	/** Slot do menu aberto (bolsa/barra) com o item, ou -1. */
+	private static int findSlot(Minecraft mc, String itemId) {
+		var menu = mc.player.containerMenu;
+		for (Slot s : menu.slots) {
+			if (s.container == mc.player.getInventory() && s.getContainerSlot() < 36 && s.hasItem()
+					&& BuiltInRegistries.ITEM.getKey(s.getItem().getItem()).toString().equals(itemId)) return s.index;
+		}
+		return -1;
 	}
 
 	/** Id do item que o jogador veste no servidor naquele lugar do corpo. */

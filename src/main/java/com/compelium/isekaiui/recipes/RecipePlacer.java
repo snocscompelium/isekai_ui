@@ -37,6 +37,9 @@ public final class RecipePlacer {
 		OK, NEED_TABLE, WRONG_STATION, NO_SERVER_ID
 	}
 
+	/** So para os testes automaticos: sempre coloca clicando item por item (sem o pedido do livro do jogo). */
+	public static boolean debugManualOnly;
+
 	private RecipePlacer() {
 	}
 
@@ -96,7 +99,7 @@ public final class RecipePlacer {
 		RecipeJournal.Entry e = v.learned();
 		Component missing = missingExact(e, menu, p);
 		if (missing != null) return missing;
-		if (e.station == Station.CRAFTING || e.station.isFurnace()) {
+		if (!debugManualOnly && (e.station == Station.CRAFTING || e.station.isFurnace())) {
 			RecipeDisplayId id = ServerRecipes.match(e);
 			if (id != null) {
 				mc.gameMode.handlePlaceRecipe(menu.containerId, id, max);

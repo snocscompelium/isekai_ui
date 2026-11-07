@@ -46,8 +46,32 @@ public class HudLayoutScreen extends Screen {
 		int gap = 8;
 		int total = 2 * w + gap;
 		int x = (this.width - total) / 2 + i * (w + gap);
-		int y = this.height / 2 + 34;
+		int y = block().y() + 78;
 		return new Rect(x, y, w, BUTTON_H);
+	}
+
+	private Component[] hints() {
+		return new Component[]{
+				Component.translatable("isekai_ui.hud_editor.hint1"),
+				Component.translatable("isekai_ui.hud_editor.hint2"),
+				Component.translatable("isekai_ui.hud_editor.hint3")};
+	}
+
+	private int infoWidth() {
+		int w = 0;
+		for (Component c : hints()) w = Math.max(w, this.font.width(c));
+		return Math.min(this.width - 20, w + 24);
+	}
+
+	/** Explicacao + botoes no meio da tela; se o minimapa estiver ali, eles vao para cima ou para baixo. */
+	private Rect block() {
+		int w = Math.max(infoWidth(), 2 * 112 + 8);
+		int h = 78 + BUTTON_H;
+		Rect b = new Rect(this.width / 2 - w / 2, this.height / 2 - 44, w, h);
+		Rect m = grabRect().grow(4);
+		boolean hit = b.x() < m.right() && m.x() < b.right() && b.y() - InventoryLayout.TAB < m.bottom() && m.y() < b.bottom();
+		if (hit) b = new Rect(b.x(), m.cy() < this.height / 2 ? this.height - h - 10 : InventoryLayout.TAB + 6, w, h);
+		return b;
 	}
 
 	@Override
@@ -68,17 +92,11 @@ public class HudLayoutScreen extends Screen {
 		boolean hover = box.contains(mouseX, mouseY) || this.dragging;
 		dashed(g, box, hover ? Theme.GOLD : 0xC0F2E6C8);
 
-		// explicacao no meio da tela
+		// explicacao no meio da tela (sai da frente quando o minimapa e arrastado para la)
 		int cx = this.width / 2;
-		int cy = this.height / 2 - 26;
-		Component[] lines = {
-				Component.translatable("isekai_ui.hud_editor.hint1"),
-				Component.translatable("isekai_ui.hud_editor.hint2"),
-				Component.translatable("isekai_ui.hud_editor.hint3")};
-		int w = 0;
-		for (Component c : lines) w = Math.max(w, this.font.width(c));
-		w = Math.min(this.width - 20, w + 24);
-		Rect info = new Rect(cx - w / 2, cy - 18, w, 18 + lines.length * 11 + 8);
+		Component[] lines = hints();
+		int w = infoWidth();
+		Rect info = new Rect(cx - w / 2, block().y(), w, 18 + lines.length * 11 + 8);
 		Panels.panel(g, this.font, info, 1f, 1f, this.title, 0f);
 		for (int i = 0; i < lines.length; i++) {
 			Draw.textFit(g, this.font, lines[i], cx, info.y() + 9 + i * 11, w - 12, i == 0 ? Theme.TEXT : Theme.TEXT_DIM, false);

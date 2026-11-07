@@ -367,6 +367,12 @@ public abstract class IsekaiMenuScreen<T extends AbstractContainerMenu> extends 
 		return p == null ? null : p.now;
 	}
 
+	/** Usado pelos testes automaticos: a janela esta aberta? */
+	public boolean debugPanelVisible(String id) {
+		Panel p = panel(id);
+		return p != null && p.visible;
+	}
+
 	private void loadLayout() {
 		Map<String, float[]> saved = IsekaiConfig.get().layouts.get(layoutKey());
 		List<Panel> moved = new ArrayList<>();
