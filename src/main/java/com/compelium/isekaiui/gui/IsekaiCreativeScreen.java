@@ -413,7 +413,8 @@ public class IsekaiCreativeScreen extends IsekaiMenuScreen<InventoryMenu> {
 				Component.translatable(third ? "isekai_ui.button.camera.third" : "isekai_ui.button.camera.first"), this::toggleCamera, third);
 		this.buttons.add("commands", "list", Component.translatable("isekai_ui.button.commands"), this::toggleCommands, IsekaiInventoryScreen.commandsOpen);
 		this.buttons.add("armor", "armor", Component.translatable("isekai_ui.button.armor_sets"), this::toggleArmor, IsekaiInventoryScreen.armorOpen);
-		this.buttons.add("trash", "trash", Component.translatable("isekai_ui.creative.trash"), () -> trash(hasShiftDown()), this::clearArmed);
+		this.buttons.add("trash", "trash", Component.translatable("isekai_ui.creative.trash"), () -> trash(hasShiftDown()), false);
+		this.buttons.alert("trash", this::clearArmed);
 		if (CpmBridge.installed()) this.buttons.add("cpm", "hanger", Component.translatable("isekai_ui.button.cpm"), this::openCpm, false);
 		for (CommandMemory.Entry e : CommandMemory.pinned()) {
 			this.buttons.add(ButtonBar.pinId(e), e.icon, Component.literal(e.label + "  (/" + e.command + ")"), () -> CommandMemory.run(e), false);

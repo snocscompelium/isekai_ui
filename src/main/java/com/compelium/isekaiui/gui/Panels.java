@@ -57,6 +57,14 @@ public final class Panels {
 		Draw.sprite(g, Theme.icon(icon), r.x() + (r.w() - 12) / 2, r.y() + (r.h() - 12) / 2, 12, 12, Draw.alpha(tint, alpha));
 	}
 
+	/** Botao hexagonal "armado" (vermelho pulsando): o proximo clique faz algo que nao tem volta. */
+	public static void hexButtonAlert(GuiGraphics g, Rect r, String icon, float alpha) {
+		if (alpha <= 0.01f) return;
+		float pulse = 0.78f + 0.22f * (float) Math.sin(System.nanoTime() / 1.6e8);
+		Draw.sprite(g, Theme.HEX_BUTTON_HOVER, r.x(), r.y(), r.w(), r.h(), Draw.alpha(0xFFE8604C, alpha * pulse));
+		Draw.sprite(g, Theme.icon(icon), r.x() + (r.w() - 12) / 2, r.y() + (r.h() - 12) / 2, 12, 12, Draw.alpha(0xFF2B0B08, alpha));
+	}
+
 	/** Linha dourada com um losango no meio (separador decorativo, 5 px de altura). */
 	public static void ornament(GuiGraphics g, int x, int y, int w, float alpha) {
 		if (alpha <= 0.01f || w < 12) return;

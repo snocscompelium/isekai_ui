@@ -36,6 +36,8 @@ public final class ButtonBar {
 	private final List<Entry> all = new ArrayList<>();
 	private final List<Entry> bar = new ArrayList<>();
 	private final List<Entry> drawer = new ArrayList<>();
+	/** Botoes que ficam vermelhos quando "armados" (ex.: lixeira esperando o segundo Shift+clique). */
+	private final Map<String, BooleanSupplier> alerts = new HashMap<>();
 	private int hoveredBar = -1;
 	private int hoveredDrawer = -1;
 
@@ -43,6 +45,17 @@ public final class ButtonBar {
 		this.all.clear();
 		this.bar.clear();
 		this.drawer.clear();
+		this.alerts.clear();
+	}
+
+	/** O botao fica vermelho e pulsando enquanto "armed" for verdadeiro. */
+	public void alert(String id, BooleanSupplier armed) {
+		this.alerts.put(id, armed);
+	}
+
+	private boolean alerting(Entry e) {
+		BooleanSupplier a = this.alerts.get(e.id());
+		return a != null && a.getAsBoolean();
 	}
 
 	public void add(String id, String icon, Component tooltip, Runnable action, boolean on) {
@@ -146,7 +159,8 @@ public final class ButtonBar {
 			if (hover) this.hoveredBar = i;
 			Entry e = this.bar.get(i);
 			boolean on = e.on().getAsBoolean();
-			Panels.hexButton(g, shown, e.icon(), hover, on, alpha * Ease.outCubic(pi));
+			if (alerting(e)) Panels.hexButtonAlert(g, shown, e.icon(), alpha * Ease.outCubic(pi));
+			else Panels.hexButton(g, shown, e.icon(), hover, on, alpha * Ease.outCubic(pi));
 		}
 		if (this.hoveredBar >= 0 && this.hoveredBar != before) UiSounds.hover();
 	}
@@ -159,7 +173,8 @@ public final class ButtonBar {
 			boolean hover = canHover && r.contains(mouseX, mouseY);
 			if (hover) this.hoveredDrawer = i;
 			Entry e = this.drawer.get(i);
-			Panels.hexButton(g, r, e.icon(), hover, e.on().getAsBoolean(), alpha);
+			if (alerting(e)) Panels.hexButtonAlert(g, r, e.icon(), alpha);
+			else Panels.hexButton(g, r, e.icon(), hover, e.on().getAsBoolean(), alpha);
 		}
 		if (this.hoveredDrawer >= 0 && this.hoveredDrawer != before) UiSounds.hover();
 	}
