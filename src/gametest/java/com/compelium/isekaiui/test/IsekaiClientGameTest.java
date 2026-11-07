@@ -68,6 +68,12 @@ public class IsekaiClientGameTest implements FabricClientGameTest {
 			mc.options.simulationDistance().set(5);
 			mc.resizeDisplay();
 		});
+		// em portugues (como o servidor joga): confere se os textos cabem nas janelas
+		ctx.runOnClient(mc -> {
+			mc.options.languageCode = "pt_br";
+			mc.getLanguageManager().setSelected("pt_br");
+			mc.getLanguageManager().onResourceManagerReload(mc.getResourceManager());
+		});
 		// mundo plano (rapido de gerar no GitHub); o cenario de teste e montado com comandos
 		try (TestSingleplayerContext sp = ctx.worldBuilder().create()) {
 			TestServerContext server = sp.getServer();
