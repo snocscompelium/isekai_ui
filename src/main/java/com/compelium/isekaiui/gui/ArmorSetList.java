@@ -33,6 +33,10 @@ public final class ArmorSetList {
 		boolean creative();
 
 		InventoryMenu menu();
+
+		/** A lista ganhou ou perdeu um conjunto: a janela precisa mudar de altura. */
+		default void resized() {
+		}
 	}
 
 	private final Font font;
@@ -141,6 +145,9 @@ public final class ArmorSetList {
 				ArmorSets.ArmorSet created = ArmorSets.saveCurrent(Minecraft.getInstance().player);
 				if (created != null) {
 					UiSounds.toggle();
+					// a janela cresce na hora e rola ate o conjunto novo
+					this.scroll = Math.max(0, ArmorSets.all().size() + 1 - MAX_ROWS);
+					this.host.resized();
 					startTyping(created);
 				} else {
 					setStatus(Component.translatable(list.size() >= ArmorSets.MAX_SETS ? "isekai_ui.armor.full" : "isekai_ui.armor.nothing_worn"));
@@ -154,6 +161,8 @@ public final class ArmorSetList {
 					stopTyping(false);
 					ArmorSets.remove(set);
 					this.confirmDelete = null;
+					this.scroll = Math.max(0, Math.min(this.scroll, ArmorSets.all().size() + 1 - MAX_ROWS));
+					this.host.resized();
 					UiSounds.toggle();
 				} else {
 					this.confirmDelete = set;
@@ -238,6 +247,20 @@ public final class ArmorSetList {
 		if (this.hoveredRow < 0 || this.hoveredRow >= list.size()) return null;
 		if (this.hoveredPart == 2) return Component.translatable("isekai_ui.armor.delete");
 		return Component.translatable(this.host.creative() ? "isekai_ui.armor.row_tip_creative" : "isekai_ui.armor.row_tip_survival");
+	}
+
+	/** Usado pelos testes automaticos: clica na linha "+ Salvar o que estou vestindo", como o jogador faria. */
+	public boolean debugSaveCurrent(Rect p) {
+		int total = ArmorSets.all().size() + 1;
+		int row = total - 1 - this.scroll;
+		if (row < 0 || row >= rowsShown()) {
+			this.scroll = Math.max(0, total - MAX_ROWS);
+			row = total - 1 - this.scroll;
+		}
+		Rect r = rowRect(p, row);
+		boolean used = click(p, r.cx(), r.cy(), 0);
+		stopTyping(true);
+		return used;
 	}
 
 	/** Usado pelos testes automaticos: veste o conjunto pelo numero. */

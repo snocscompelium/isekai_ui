@@ -10,6 +10,12 @@ base {
 }
 
 repositories {
+	// Mod Menu (opcional): so para o botao de configuracoes aparecer na lista de mods
+	maven {
+		name = "Terraformers"
+		url = "https://maven.terraformersmc.com/releases/"
+		content { includeGroup "com.terraformersmc" }
+	}
 }
 
 dependencies {
@@ -17,6 +23,7 @@ dependencies {
 	mappings loom.officialMojangMappings()
 	modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
 	modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+	modCompileOnly("com.terraformersmc:modmenu:${project.modmenu_version}") { transitive = false }
 }
 
 // Testes automaticos do cliente (abre o jogo no GitHub, tira prints da interface)

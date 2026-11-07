@@ -27,36 +27,43 @@ public final class UiSounds {
 	}
 
 	public static void windowOpen() {
-		play(WINDOW_OPEN, 1.0f, 0.9f);
+		play(WINDOW_OPEN, 1.0f, 0.9f, true);
 	}
 
 	public static void windowClose() {
-		play(WINDOW_CLOSE, 1.0f, 0.8f);
+		play(WINDOW_CLOSE, 1.0f, 0.8f, true);
 	}
 
 	public static void mapOpen() {
-		play(MAP_OPEN, 1.0f, 0.9f);
+		play(MAP_OPEN, 1.0f, 0.9f, true);
 	}
 
 	public static void mapClose() {
-		play(MAP_CLOSE, 1.0f, 0.8f);
+		play(MAP_CLOSE, 1.0f, 0.8f, true);
 	}
 
 	public static void click() {
-		play(CLICK, 1.0f, 0.7f);
+		play(CLICK, 1.0f, 0.7f, false);
 	}
 
 	public static void hover() {
-		play(HOVER, 1.0f, 0.6f);
+		play(HOVER, 1.0f, 0.6f, false);
 	}
 
 	public static void toggle() {
-		play(TOGGLE, 1.0f, 0.75f);
+		play(TOGGLE, 1.0f, 0.75f, false);
 	}
 
-	private static void play(SoundEvent event, float pitch, float volume) {
+	/** Som de exemplo para quem esta mexendo no volume nas configuracoes. */
+	public static void preview(boolean window) {
+		if (window) windowOpen();
+		else click();
+	}
+
+	private static void play(SoundEvent event, float pitch, float volume, boolean window) {
 		IsekaiConfig cfg = IsekaiConfig.get();
-		if (!cfg.uiSounds || cfg.uiSoundVolume <= 0f) return;
-		Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(event, pitch, volume * cfg.uiSoundVolume));
+		float v = volume * cfg.uiSoundVolume * (window ? cfg.windowSoundVolume : cfg.clickSoundVolume);
+		if (!cfg.uiSounds || v <= 0.001f) return;
+		Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(event, pitch, v));
 	}
 }

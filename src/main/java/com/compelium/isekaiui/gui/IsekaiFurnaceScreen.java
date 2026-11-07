@@ -125,12 +125,7 @@ public class IsekaiFurnaceScreen extends IsekaiStationScreen<AbstractFurnaceMenu
 	}
 
 	@Override
-	protected void addStationButtons() {
-		addSideButton(this.station, "book", Component.translatable("isekai_ui.button.recipe_book"), this::openRecipeBook, () -> false);
-	}
-
-	private void openRecipeBook() {
-		if (this.minecraft.player != null) this.minecraft.player.getRecipeBook().setOpen(this.menu.getRecipeBookType(), true);
-		openVanillaFallback();
+	protected RecipeBookPanel.Tab grimoireTab() {
+		return RecipeBookPanel.Tab.FURNACES;
 	}
 }

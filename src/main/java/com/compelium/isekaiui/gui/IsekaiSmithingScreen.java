@@ -84,4 +84,9 @@ public class IsekaiSmithingScreen extends IsekaiStationScreen<SmithingMenu> {
 			infoLine(g, line, r, Theme.TEXT_DIM, alpha);
 		}
 	}
+
+	@Override
+	protected RecipeBookPanel.Tab grimoireTab() {
+		return RecipeBookPanel.Tab.SMITHING;
+	}
 }

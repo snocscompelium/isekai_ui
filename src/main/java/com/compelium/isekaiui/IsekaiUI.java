@@ -40,6 +40,8 @@ public final class IsekaiUI implements ClientModInitializer {
 		ClientTickEvents.END_CLIENT_TICK.register(IsekaiKeys::tick);
 		ClientTickEvents.END_CLIENT_TICK.register(com.compelium.isekaiui.client.Instruments::tick);
 		ClientTickEvents.END_CLIENT_TICK.register(mc -> com.compelium.isekaiui.creative.ArmorSets.tick());
+		ClientTickEvents.END_CLIENT_TICK.register(com.compelium.isekaiui.recipes.RecipeObserver::tick);
+		ClientTickEvents.END_CLIENT_TICK.register(com.compelium.isekaiui.recipes.ClickQueue::tick);
 		net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback.EVENT.register(com.compelium.isekaiui.client.HudOverlay::render);
 		LOG.info("Compelium's Isekai UI pronto.");
 	}

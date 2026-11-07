@@ -1,5 +1,6 @@
 package com.compelium.isekaiui.gui;
 
+import com.compelium.isekaiui.client.CpmBridge;
 import com.compelium.isekaiui.client.Instruments;
 import com.compelium.isekaiui.client.IsekaiKeys;
 import com.compelium.isekaiui.client.UiSounds;
@@ -76,7 +77,7 @@ public class IsekaiCreativeScreen extends IsekaiMenuScreen<InventoryMenu> {
 	private static int lastRealTab;
 
 	private final LocalPlayer player;
-	private final List<BarButton> buttons = new ArrayList<>();
+	private final ButtonBar buttons = new ButtonBar();
 	private final MapView miniView = new MapView();
 	private CreativeInventoryListener listener;
 	private List<CreativeModeTab> tabs = List.of();
@@ -100,11 +101,14 @@ public class IsekaiCreativeScreen extends IsekaiMenuScreen<InventoryMenu> {
 	private Panel commands;
 	private Panel armor;
 	private Panel editor;
+	private Panel drawer;
+	private float drawerAppearAt;
+	/** Momento do primeiro Shift+clique na lixeira (o segundo, logo depois, limpa a bolsa e a barra). */
+	private long clearArmedNanos;
 
 	private int hoveredCell = -1;
 	private int hoveredTabCell = CELL_NONE;
 	private int hoveredMode = -1;
-	private int hoveredButton = -1;
 	private int hoveredEditorPart;
 	private boolean miniHovered;
 	/** Tecla ja tratada: ignora o caractere que o sistema manda logo depois (ex.: "1" nao vira busca). */
@@ -118,9 +122,6 @@ public class IsekaiCreativeScreen extends IsekaiMenuScreen<InventoryMenu> {
 
 	private Component toast;
 	private long toastNanos;
-
-	private record BarButton(String icon, Component tooltip, Runnable action, boolean on) {
-	}
 
 	/** Posicoes padrao das janelas para um tamanho de tela. */
 	private record Layout(int cols, Rect equip, Rect library, Rect bar, Rect mini, Rect bag) {
@@ -164,8 +165,8 @@ public class IsekaiCreativeScreen extends IsekaiMenuScreen<InventoryMenu> {
 		Rect equipR = new Rect(x0, (H - EQUIP_H) / 2 + 4, EQUIP_W, EQUIP_H);
 		int libY = Math.max(TAB + 4, (H - (TAB + LIB_H + 6 + InventoryLayout.HEX_H)) / 2 + TAB);
 		Rect libR = new Rect(equipR.right() + 8, libY, libWidth(cols), LIB_H);
-		int barW = Math.max(1, buttons) * InventoryLayout.BUTTON_STEP;
-		Rect barR = new Rect(libR.cx() - barW / 2, libR.bottom() + 6, barW, InventoryLayout.HEX_H);
+		int barW = Math.max(1, buttons) * InventoryLayout.BUTTON_STEP - 2;
+		Rect barR = new Rect(libR.cx() - barW / 2, libR.bottom() + 6, barW, InventoryLayout.HEX_H + 2);
 		int miniH = Mth.clamp(H - 168, 50, 96);
 		int rightH = TAB + miniH + 12 + 8 + TAB + BAG_H;
 		int top = Math.max(TAB + 4, (H - rightH) / 2 + TAB);
@@ -174,8 +175,22 @@ public class IsekaiCreativeScreen extends IsekaiMenuScreen<InventoryMenu> {
 		return new Layout(cols, equipR, libR, barR, miniR, bagR);
 	}
 
+	/** Quantos botoes a barra vai ter (o mesmo calculo da barra de verdade, para achar o minimapa). */
 	private static int expectedButtonCount() {
-		return 5 + CommandMemory.pinned().size();
+		ButtonBar b = new ButtonBar();
+		for (String id : new String[]{"classic", "camera", "commands", "armor", "trash"}) b.add(id, "star", Component.empty(), () -> {
+		}, false);
+		if (CpmBridge.installed()) b.add("cpm", "hanger", Component.empty(), () -> {
+		}, false);
+		for (CommandMemory.Entry e : CommandMemory.pinned()) b.add(ButtonBar.pinId(e), "star", Component.empty(), () -> {
+		}, false);
+		b.add(ButtonBar.SETTINGS, "gear", Component.empty(), () -> {
+		}, false);
+		boolean open = ButtonBar.drawerOpen;
+		b.arrange(() -> {
+		});
+		ButtonBar.drawerOpen = open;
+		return b.barCount();
 	}
 
 	/** Onde o minimapa fica na tela (respeitando o layout salvo) — usado pelo mapa grande para voltar. */
@@ -255,7 +270,7 @@ public class IsekaiCreativeScreen extends IsekaiMenuScreen<InventoryMenu> {
 	@Override
 	protected void createPanels() {
 		buildButtons();
-		this.layout = compute(this.width, this.height, this.buttons.size());
+		this.layout = compute(this.width, this.height, this.buttons.barCount());
 		Layout L = this.layout;
 		// sem aba de titulo: a janela do equipamento e estreita e o nome do jogador ficaria por baixo da biblioteca
 		this.equip = addPanel("equip", 0.05f, -26, 0, true, null, L.equip());
@@ -317,6 +332,11 @@ public class IsekaiCreativeScreen extends IsekaiMenuScreen<InventoryMenu> {
 			public InventoryMenu menu() {
 				return IsekaiCreativeScreen.this.menu;
 			}
+
+			@Override
+			public void resized() {
+				resizeArmorPanel();
+			}
 		});
 		else this.armorList.stopTyping(false);
 		int ah = ArmorSetList.height();
@@ -342,6 +362,29 @@ public class IsekaiCreativeScreen extends IsekaiMenuScreen<InventoryMenu> {
 		} else {
 			this.editingTab = -1;
 		}
+
+		// gaveta da barra (botoes que nao couberam), presa em cima do botao "..."
+		this.drawer = addPanel("bar_drawer", this.drawerAppearAt, 0, 8, true, null, drawerRect(L.bar()));
+		this.drawer.overlay = true;
+		this.drawer.fixed = true;
+		this.drawer.visible = ButtonBar.drawerOpen && this.buttons.hasDrawer();
+	}
+
+	/** A janela de conjuntos muda de altura na hora (cresce para cima, o pe fica no lugar). */
+	private void resizeArmorPanel() {
+		if (this.armor == null) return;
+		int ah = ArmorSetList.height();
+		Rect r = this.armor.rect;
+		this.armor.rect = new Rect(r.x(), Math.max(TAB + 1, r.bottom() - ah), r.w(), ah);
+		Rect d = this.armor.def;
+		this.armor.def = new Rect(d.x(), Math.max(TAB + 1, d.bottom() - ah), d.w(), ah);
+	}
+
+	private Rect drawerRect(Rect barRect) {
+		Rect d = this.buttons.drawerRect(barRect);
+		int x = Mth.clamp(d.x(), 2, Math.max(2, this.width - d.w() - 2));
+		int y = d.y() < 2 ? barRect.bottom() + 8 : d.y();
+		return new Rect(x, y, d.w(), d.h());
 	}
 
 	private void createSearch(Layout L) {
@@ -358,15 +401,18 @@ public class IsekaiCreativeScreen extends IsekaiMenuScreen<InventoryMenu> {
 	private void buildButtons() {
 		this.buttons.clear();
 		boolean third = IsekaiConfig.get().thirdPersonCamera;
-		this.buttons.add(new BarButton("catalog", Component.translatable("isekai_ui.creative.classic"), this::openClassic, false));
-		this.buttons.add(new BarButton(third ? "camera_third" : "camera_first",
-				Component.translatable(third ? "isekai_ui.button.camera.third" : "isekai_ui.button.camera.first"), this::toggleCamera, third));
-		this.buttons.add(new BarButton("list", Component.translatable("isekai_ui.button.commands"), this::toggleCommands, IsekaiInventoryScreen.commandsOpen));
-		this.buttons.add(new BarButton("armor", Component.translatable("isekai_ui.button.armor_sets"), this::toggleArmor, IsekaiInventoryScreen.armorOpen));
-		this.buttons.add(new BarButton("trash", Component.translatable("isekai_ui.creative.trash"), this::trashCarried, false));
+		this.buttons.add("classic", "catalog", Component.translatable("isekai_ui.creative.classic"), this::openClassic, false);
+		this.buttons.add("camera", third ? "camera_third" : "camera_first",
+				Component.translatable(third ? "isekai_ui.button.camera.third" : "isekai_ui.button.camera.first"), this::toggleCamera, third);
+		this.buttons.add("commands", "list", Component.translatable("isekai_ui.button.commands"), this::toggleCommands, IsekaiInventoryScreen.commandsOpen);
+		this.buttons.add("armor", "armor", Component.translatable("isekai_ui.button.armor_sets"), this::toggleArmor, IsekaiInventoryScreen.armorOpen);
+		this.buttons.add("trash", "trash", Component.translatable("isekai_ui.creative.trash"), () -> trash(hasShiftDown()), this::clearArmed);
+		if (CpmBridge.installed()) this.buttons.add("cpm", "hanger", Component.translatable("isekai_ui.button.cpm"), this::openCpm, false);
 		for (CommandMemory.Entry e : CommandMemory.pinned()) {
-			this.buttons.add(new BarButton(e.icon, Component.literal(e.label + "  (/" + e.command + ")"), () -> CommandMemory.run(e), false));
+			this.buttons.add(ButtonBar.pinId(e), e.icon, Component.literal(e.label + "  (/" + e.command + ")"), () -> CommandMemory.run(e), false);
 		}
+		this.buttons.add(ButtonBar.SETTINGS, "gear", Component.translatable("isekai_ui.button.settings"), this::openSettings, false);
+		this.buttons.arrange(this::toggleDrawer);
 	}
 
 	private static Component modeName(boolean personal) {
@@ -405,10 +451,77 @@ public class IsekaiCreativeScreen extends IsekaiMenuScreen<InventoryMenu> {
 		rebuildWidgets();
 	}
 
-	private void trashCarried() {
-		if (this.menu.getCarried().isEmpty()) return;
-		this.menu.setCarried(ItemStack.EMPTY);
+	/**
+	 * Lixeira: com um item na mao, apaga o item. Com a mao vazia, Shift + clique duas vezes seguidas limpa a bolsa
+	 * e a barra de atalhos (a armadura e a mao secundaria ficam, como protecao).
+	 */
+	private void trash(boolean shift) {
+		if (!this.menu.getCarried().isEmpty()) {
+			this.menu.setCarried(ItemStack.EMPTY);
+			this.clearArmedNanos = 0L;
+			UiSounds.toggle();
+			return;
+		}
+		if (!shift) {
+			showToast(Component.translatable("isekai_ui.creative.trash_hint"));
+			return;
+		}
+		if (clearArmed()) {
+			this.clearArmedNanos = 0L;
+			clearInventory();
+			return;
+		}
+		this.clearArmedNanos = System.nanoTime();
+		showToast(Component.translatable("isekai_ui.creative.clear_confirm"));
+		UiSounds.click();
+	}
+
+	private boolean clearArmed() {
+		return this.clearArmedNanos != 0L && System.nanoTime() - this.clearArmedNanos < CONFIRM_NANOS;
+	}
+
+	/** Apaga a bolsa (9-35) e a barra de atalhos (36-44); o servidor recebe cada slot pelo ouvinte do criativo. */
+	private void clearInventory() {
+		int cleared = 0;
+		for (int i = 9; i <= 44; i++) {
+			Slot s = this.menu.getSlot(i);
+			if (!s.hasItem()) continue;
+			s.setByPlayer(ItemStack.EMPTY);
+			cleared++;
+		}
+		this.menu.broadcastChanges();
+		showToast(Component.translatable(cleared > 0 ? "isekai_ui.creative.cleared" : "isekai_ui.creative.already_empty"));
 		UiSounds.toggle();
+	}
+
+	private void toggleDrawer() {
+		ButtonBar.drawerOpen = !ButtonBar.drawerOpen;
+		this.drawerAppearAt = time();
+		UiSounds.toggle();
+		rebuildWidgets();
+	}
+
+	private void closeDrawer() {
+		ButtonBar.drawerOpen = false;
+		if (this.drawer != null) this.drawer.visible = false;
+	}
+
+	/** Fecha o criativo (o que estava na mao volta para a bolsa) e abre outra tela. */
+	private void leaveTo(Runnable open) {
+		if (isClosing()) return;
+		closeEditor(true);
+		if (this.minecraft.player != null) this.minecraft.player.closeContainer();
+		open.run();
+	}
+
+	private void openSettings() {
+		LocalPlayer p = this.player;
+		leaveTo(() -> this.minecraft.setScreen(new SettingsScreen(new InventoryScreen(p))));
+	}
+
+	private void openCpm() {
+		LocalPlayer p = this.player;
+		leaveTo(() -> CpmBridge.open(this.minecraft, new InventoryScreen(p)));
 	}
 
 	private void openMap() {
@@ -654,8 +767,9 @@ public class IsekaiCreativeScreen extends IsekaiMenuScreen<InventoryMenu> {
 			int label = searchLabelWidth(this.library.now);
 			this.search.setWidth(Math.max(30, s.w() - 19 - (label > 0 ? label + 6 : 0)));
 		}
-		// o editor de aba acompanha a biblioteca (se ela foi arrastada)
+		// o editor de aba acompanha a biblioteca (se ela foi arrastada); a gaveta acompanha a barra
 		if (this.editor != null && this.editor.visible) this.editor.rect = editorRect(this.library.rect);
+		if (this.drawer != null && this.bar != null) this.drawer.rect = drawerRect(this.bar.rect);
 	}
 
 	private static int hotbarX(Rect b) {
@@ -702,7 +816,9 @@ public class IsekaiCreativeScreen extends IsekaiMenuScreen<InventoryMenu> {
 		} else if (p == this.mini) {
 			drawMinimap(g, p, partialTick, mouseX, mouseY, free);
 		} else if (p == this.bar) {
-			drawBar(g, p, mouseX, mouseY, free);
+			this.buttons.drawBar(g, p.now, p.alpha > 0f ? 1f : 0f, p.progress, mouseX, mouseY, free);
+		} else if (p == this.drawer) {
+			this.buttons.drawDrawer(g, p.now, a, mouseX, mouseY, canHover && overlayAt(mouseX, mouseY) == p);
 		} else if (p == this.commands) {
 			this.commandList.draw(g, p.now, a, mouseX, mouseY, partialTick, canHover);
 		} else if (p == this.armor) {
@@ -862,23 +978,6 @@ public class IsekaiCreativeScreen extends IsekaiMenuScreen<InventoryMenu> {
 		}
 	}
 
-	private Rect buttonRect(Rect bar, int i) {
-		return new Rect(bar.x() + i * InventoryLayout.BUTTON_STEP + 1, bar.y(), InventoryLayout.HEX_W, InventoryLayout.HEX_H);
-	}
-
-	private void drawBar(GuiGraphics g, Panel p, int mouseX, int mouseY, boolean canHover) {
-		int before = this.hoveredButton;
-		this.hoveredButton = -1;
-		for (int i = 0; i < this.buttons.size(); i++) {
-			Rect r = buttonRect(p.now, i);
-			boolean hover = canHover && r.contains(mouseX, mouseY);
-			if (hover) this.hoveredButton = i;
-			BarButton b = this.buttons.get(i);
-			Panels.hexButton(g, r, b.icon(), hover, b.on(), p.alpha);
-		}
-		if (this.hoveredButton >= 0 && this.hoveredButton != before) UiSounds.hover();
-	}
-
 	private void drawEditor(GuiGraphics g, Rect e, float a, int mouseX, int mouseY, float partialTick, boolean canHover) {
 		this.hoveredEditorPart = 0;
 		if (this.editingTab < 0) return;
@@ -964,11 +1063,12 @@ public class IsekaiCreativeScreen extends IsekaiMenuScreen<InventoryMenu> {
 	protected void renderOverlay(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
 		drawToast(g);
 		if (isClosing() || isDraggingPanel()) return;
-		if (this.hoveredButton >= 0 && this.hoveredButton < this.buttons.size()) {
-			this.setTooltipForNextRenderPass(this.buttons.get(this.hoveredButton).tooltip());
+		Panel over = overlayAt(mouseX, mouseY);
+		Component barTip = this.buttons.tooltip(this.drawer != null && this.drawer.visible);
+		if (barTip != null && (this.buttons.hoveringBar() || (over != null && over == this.drawer))) {
+			this.setTooltipForNextRenderPass(barTip);
 			return;
 		}
-		Panel over = overlayAt(mouseX, mouseY);
 		if (over != null) {
 			Component tip = over == this.commands ? this.commandList.tooltip()
 					: over == this.armor ? this.armorList.tooltip()
@@ -1131,6 +1231,12 @@ public class IsekaiCreativeScreen extends IsekaiMenuScreen<InventoryMenu> {
 			boolean onItem = this.hoveredSlot != null || cellAt(this.library.now, mouseX, mouseY) >= 0;
 			if (!onItem) closeEditor(true);
 		}
+		// clicar fora da gaveta fecha a gaveta (o clique continua valendo para o que estiver embaixo)
+		if (ButtonBar.drawerOpen && this.drawer != null && this.drawer.visible && !isClosing()) {
+			Rect more = this.buttons.find(ButtonBar.MORE, this.bar.now, null);
+			boolean onMore = more != null && more.contains(mouseX, mouseY);
+			if (!onMore && !this.drawer.grabArea().contains(mouseX, mouseY)) closeDrawer();
+		}
 		return super.mouseClicked(mouseX, mouseY, button);
 	}
 
@@ -1140,15 +1246,10 @@ public class IsekaiCreativeScreen extends IsekaiMenuScreen<InventoryMenu> {
 			openMap();
 			return true;
 		}
-		if (p == this.bar && button == 0) {
-			for (int i = 0; i < this.buttons.size(); i++) {
-				if (buttonRect(p.now, i).contains(mouseX, mouseY)) {
-					UiSounds.click();
-					this.buttons.get(i).action().run();
-					return true;
-				}
-			}
-			return false;
+		if (p == this.bar && button == 0) return this.buttons.clickBar(p.now, mouseX, mouseY);
+		if (p == this.drawer) {
+			if (button == 0) this.buttons.clickDrawer(p.now, mouseX, mouseY, this::closeDrawer);
+			return true;
 		}
 		if (p == this.commands) return this.commandList.click(p.now, mouseX, mouseY, button);
 		if (p == this.armor) return this.armorList.click(p.now, mouseX, mouseY, button);
@@ -1418,6 +1519,7 @@ public class IsekaiCreativeScreen extends IsekaiMenuScreen<InventoryMenu> {
 		if (over == this.commands) return this.commandList.scroll(scrollY);
 		if (over == this.armor) return this.armorList.scroll(scrollY);
 		if (over != null) return true;
+		if (this.library == null) return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
 		Rect c = this.library.now;
 		if (c.contains(mouseX, mouseY)) {
 			int maxOff = maxTabOffset(tabCells().length, perRow(c));
@@ -1600,6 +1702,15 @@ public class IsekaiCreativeScreen extends IsekaiMenuScreen<InventoryMenu> {
 	/** Quantas celulas a grade mostra agora (itens do catalogo, 54 de uma aba, ou resultados da busca no bau). */
 	public int debugCellCount() {
 		return cellCount();
+	}
+
+	/** Lixeira como o jogador usaria (shift = Shift apertado). */
+	public void debugTrash(boolean shift) {
+		trash(shift);
+	}
+
+	public Rect debugButtonRect(String id) {
+		return this.buttons.find(id, this.bar.now, this.drawer != null && this.drawer.visible ? this.drawer.now : null);
 	}
 
 	/** Abre a janela de conjuntos e veste o conjunto pelo numero (copias, como no criativo). */

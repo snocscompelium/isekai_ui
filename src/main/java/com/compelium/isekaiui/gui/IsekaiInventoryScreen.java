@@ -1,6 +1,6 @@
 package com.compelium.isekaiui.gui;
 
-import com.compelium.isekaiui.anim.Ease;
+import com.compelium.isekaiui.client.CpmBridge;
 import com.compelium.isekaiui.client.IsekaiKeys;
 import com.compelium.isekaiui.client.ReturnToContainer;
 import com.compelium.isekaiui.client.UiSounds;
@@ -12,6 +12,7 @@ import com.compelium.isekaiui.map.MapRenderer;
 import com.compelium.isekaiui.map.MapView;
 import net.minecraft.Util;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
@@ -19,7 +20,6 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.InventoryMenu;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -34,8 +34,9 @@ public class IsekaiInventoryScreen extends IsekaiMenuScreen<InventoryMenu> {
 	private static boolean vanillaBypass;
 	static boolean commandsOpen;
 	static boolean armorOpen;
+	static boolean grimoireOpen;
 
-	private final List<BarButton> buttons = new ArrayList<>();
+	private final ButtonBar buttons = new ButtonBar();
 	private final MapView miniView = new MapView();
 	private InventoryLayout layout;
 	private Panel equip;
@@ -44,7 +45,11 @@ public class IsekaiInventoryScreen extends IsekaiMenuScreen<InventoryMenu> {
 	private Panel craft;
 	private Panel bar;
 	private Panel commands;
-	private int hoveredButton = -1;
+	private Panel drawer;
+	private Panel grimoirePanel;
+	private RecipeBookPanel grimoire;
+	private float drawerAppearAt;
+	private float grimoireAppearAt;
 	private boolean miniHovered;
 	private CommandList commandList;
 	private ArmorSetList armorList;
@@ -52,9 +57,6 @@ public class IsekaiInventoryScreen extends IsekaiMenuScreen<InventoryMenu> {
 	private float armorAppearAt;
 	/** Momento (segundos desde que a tela abriu) em que a lista de comandos foi aberta, para animar a entrada. */
 	private float commandsAppearAt;
-
-	private record BarButton(String icon, Component tooltip, Runnable action, boolean on) {
-	}
 
 	public IsekaiInventoryScreen(Player player) {
 		super(player.inventoryMenu, player.getInventory(), Component.translatable("isekai_ui.inventory.title"));
@@ -88,7 +90,7 @@ public class IsekaiInventoryScreen extends IsekaiMenuScreen<InventoryMenu> {
 	@Override
 	protected void createPanels() {
 		buildButtons();
-		this.layout = InventoryLayout.compute(this.width, this.height, this.buttons.size());
+		this.layout = InventoryLayout.compute(this.width, this.height, this.buttons.barCount());
 		InventoryLayout L = this.layout;
 		this.equip = addPanel("equip", 0.05f, -26, 0, true, this.owner.getName(), L.equip);
 		this.main = addPanel("main", 0f, 28, 0, true, Component.translatable("isekai_ui.panel.inventory"), L.main);
@@ -142,6 +144,11 @@ public class IsekaiInventoryScreen extends IsekaiMenuScreen<InventoryMenu> {
 			public net.minecraft.world.inventory.InventoryMenu menu() {
 				return IsekaiInventoryScreen.this.menu;
 			}
+
+			@Override
+			public void resized() {
+				resizeArmorPanel();
+			}
 		});
 		else this.armorList.stopTyping(false);
 		int ah = ArmorSetList.height();
@@ -149,32 +156,92 @@ public class IsekaiInventoryScreen extends IsekaiMenuScreen<InventoryMenu> {
 		this.armor = addPanel("armor_sets", this.armorAppearAt, 0, 10, true, Component.translatable("isekai_ui.panel.armor_sets"), armorDef);
 		this.armor.overlay = true;
 		this.armor.visible = armorOpen;
+
+		// grimorio de receitas (por cima, acima da barra, sem cobrir a sintese)
+		if (this.grimoire == null) this.grimoire = new RecipeBookPanel(this.font, new RecipeBookPanel.Host() {
+			@Override
+			public net.minecraft.world.inventory.AbstractContainerMenu menu() {
+				return IsekaiInventoryScreen.this.menu;
+			}
+
+			@Override
+			public void addInput(EditBox box) {
+				addWidget(box);
+			}
+
+			@Override
+			public void focusInput(EditBox box) {
+				setFocused(box);
+			}
+
+			@Override
+			public void blurInput() {
+				setFocused(null);
+			}
+		}, RecipeBookPanel.Tab.CRAFTING);
+		this.grimoire.attach();
+		int gx = Mth.clamp(L.main.right() - RecipeBookPanel.W, 4, Math.max(4, this.width - RecipeBookPanel.W - 4));
+		Rect grimoireDef = new Rect(gx, L.bar.y() - 10 - RecipeBookPanel.H, RecipeBookPanel.W, RecipeBookPanel.H);
+		this.grimoirePanel = addPanel("grimoire", this.grimoireAppearAt, 0, 10, true, Component.translatable("isekai_ui.panel.grimoire"), grimoireDef);
+		this.grimoirePanel.overlay = true;
+		this.grimoirePanel.visible = grimoireOpen;
+		this.grimoirePanel.content = this.grimoire;
+
+		// gaveta da barra (botoes que nao couberam), presa em cima do botao "..."
+		this.drawer = addPanel("bar_drawer", this.drawerAppearAt, 0, 8, true, null, drawerRect(L.bar));
+		this.drawer.overlay = true;
+		this.drawer.fixed = true;
+		this.drawer.visible = ButtonBar.drawerOpen && this.buttons.hasDrawer();
+	}
+
+	/** A janela de conjuntos muda de altura na hora (cresce para cima, o pe fica no lugar). */
+	private void resizeArmorPanel() {
+		if (this.armor == null) return;
+		int ah = ArmorSetList.height();
+		int top = InventoryLayout.TAB + 1;
+		Rect r = this.armor.rect;
+		this.armor.rect = new Rect(r.x(), Math.max(top, r.bottom() - ah), r.w(), ah);
+		Rect d = this.armor.def;
+		this.armor.def = new Rect(d.x(), Math.max(top, d.bottom() - ah), d.w(), ah);
+	}
+
+	/** Gaveta em cima do botao "..." (ou embaixo, se a barra foi arrastada para o alto da tela). */
+	private Rect drawerRect(Rect barRect) {
+		Rect d = this.buttons.drawerRect(barRect);
+		int x = Mth.clamp(d.x(), 2, Math.max(2, this.width - d.w() - 2));
+		int y = d.y() < 2 ? barRect.bottom() + 8 : d.y();
+		return new Rect(x, y, d.w(), d.h());
 	}
 
 	private void buildButtons() {
 		this.buttons.clear();
 		IsekaiConfig cfg = IsekaiConfig.get();
-		this.buttons.add(new BarButton("map", Component.translatable("isekai_ui.button.map", IsekaiKeys.mapKeyName()), this::openMap, false));
+		this.buttons.add("map", "map", Component.translatable("isekai_ui.button.map", IsekaiKeys.mapKeyName()), this::openMap, false);
 		boolean third = cfg.thirdPersonCamera;
-		this.buttons.add(new BarButton(third ? "camera_third" : "camera_first",
-				Component.translatable(third ? "isekai_ui.button.camera.third" : "isekai_ui.button.camera.first"),
-				this::toggleCamera, third));
-		this.buttons.add(new BarButton("list", Component.translatable("isekai_ui.button.commands"), this::toggleCommands, commandsOpen));
-		this.buttons.add(new BarButton("armor", Component.translatable("isekai_ui.button.armor_sets"), this::toggleArmor, armorOpen));
+		this.buttons.add("camera", third ? "camera_third" : "camera_first",
+				Component.translatable(third ? "isekai_ui.button.camera.third" : "isekai_ui.button.camera.first"), this::toggleCamera, third);
+		this.buttons.add("commands", "list", Component.translatable("isekai_ui.button.commands"), this::toggleCommands, commandsOpen);
+		this.buttons.add("armor", "armor", Component.translatable("isekai_ui.button.armor_sets"), this::toggleArmor, armorOpen);
+		this.buttons.add("grimoire", "book", Component.translatable("isekai_ui.button.grimoire"), this::toggleGrimoire, grimoireOpen);
 		if (ReturnToContainer.available()) {
-			this.buttons.add(new BarButton("chest", Component.translatable("isekai_ui.button.back_to_chest"), this::returnToChest, false));
+			this.buttons.add("chest", "chest", Component.translatable("isekai_ui.button.back_to_chest"), this::returnToChest, false);
 		}
+		if (CpmBridge.installed()) this.buttons.add("cpm", "hanger", Component.translatable("isekai_ui.button.cpm"), this::openCpm, false);
 		for (CommandMemory.Entry e : CommandMemory.pinned()) {
-			this.buttons.add(new BarButton(e.icon, Component.literal(e.label + "  (/" + e.command + ")"), () -> CommandMemory.run(e), false));
+			this.buttons.add(ButtonBar.pinId(e), e.icon, Component.literal(e.label + "  (/" + e.command + ")"), () -> CommandMemory.run(e), false);
 		}
-		for (IsekaiConfig.MenuButton b : cfg.menuButtons) {
+		List<IsekaiConfig.MenuButton> menuButtons = cfg.menuButtons;
+		for (int i = 0; i < menuButtons.size(); i++) {
+			IsekaiConfig.MenuButton b = menuButtons.get(i);
 			if (b == null || b.command == null || b.command.isBlank()) continue;
 			String cmd = b.command.strip().startsWith("/") ? b.command.strip().substring(1) : b.command.strip();
 			String label = b.label == null || b.label.isBlank() ? "/" + cmd : b.label;
-			this.buttons.add(new BarButton(b.icon == null ? "star" : b.icon, Component.literal(label), () -> {
+			this.buttons.add("cfg:" + i, b.icon == null ? "star" : b.icon, Component.literal(label), () -> {
 				if (this.minecraft.player != null) this.minecraft.player.connection.sendCommand(cmd);
-			}, false));
+			}, false);
 		}
+		this.buttons.add(ButtonBar.SETTINGS, "gear", Component.translatable("isekai_ui.button.settings"), this::openSettings, false);
+		this.buttons.arrange(this::toggleDrawer);
 	}
 
 	@Override
@@ -192,15 +259,35 @@ public class IsekaiInventoryScreen extends IsekaiMenuScreen<InventoryMenu> {
 			setSlot(1 + c, L.craftX + (c % 2) * InventoryLayout.SLOT + cdx, L.craftY + (c / 2) * InventoryLayout.SLOT + cdy);
 		}
 		setSlot(0, L.resultX + cdx, L.resultY + cdy);
+		// a gaveta acompanha a barra (se ela foi arrastada)
+		if (this.drawer != null && this.bar != null) this.drawer.rect = drawerRect(this.bar.rect);
 	}
 
-	/** Quantos botoes a barra vai ter (fixos + comandos com pin + botoes do arquivo de configuracao). */
+	/** Quantos botoes a barra vai ter (o mesmo calculo da barra de verdade, para achar o minimapa). */
 	private static int expectedButtonCount() {
-		int n = 4 + CommandMemory.pinned().size() + (ReturnToContainer.available() ? 1 : 0);
-		for (IsekaiConfig.MenuButton b : IsekaiConfig.get().menuButtons) {
-			if (b != null && b.command != null && !b.command.isBlank()) n++;
+		ButtonBar b = new ButtonBar();
+		String[] base = {"map", "camera", "commands", "armor", "grimoire"};
+		for (String id : base) b.add(id, "star", Component.empty(), () -> {
+		}, false);
+		if (ReturnToContainer.available()) b.add("chest", "chest", Component.empty(), () -> {
+		}, false);
+		if (CpmBridge.installed()) b.add("cpm", "hanger", Component.empty(), () -> {
+		}, false);
+		for (CommandMemory.Entry e : CommandMemory.pinned()) b.add(ButtonBar.pinId(e), "star", Component.empty(), () -> {
+		}, false);
+		List<IsekaiConfig.MenuButton> menuButtons = IsekaiConfig.get().menuButtons;
+		for (int i = 0; i < menuButtons.size(); i++) {
+			IsekaiConfig.MenuButton m = menuButtons.get(i);
+			if (m != null && m.command != null && !m.command.isBlank()) b.add("cfg:" + i, "star", Component.empty(), () -> {
+			}, false);
 		}
-		return n;
+		b.add(ButtonBar.SETTINGS, "gear", Component.empty(), () -> {
+		}, false);
+		boolean open = ButtonBar.drawerOpen;
+		b.arrange(() -> {
+		});
+		ButtonBar.drawerOpen = open;
+		return b.barCount();
 	}
 
 	@Override
@@ -226,12 +313,26 @@ public class IsekaiInventoryScreen extends IsekaiMenuScreen<InventoryMenu> {
 
 	// ------------------------------------------------------------------ testes automaticos
 
-	/** Retangulo de um botao da barra (pelo nome do icone), ou null. */
-	public Rect debugButtonRect(String icon) {
-		for (int i = 0; i < this.buttons.size(); i++) {
-			if (this.buttons.get(i).icon().equals(icon)) return buttonRect(this.bar.now, i);
-		}
-		return null;
+	/** Retangulo de um botao da barra ou da gaveta aberta (pelo id: map, camera, commands, armor, grimoire...), ou null. */
+	public Rect debugButtonRect(String id) {
+		return this.buttons.find(id, this.bar.now, this.drawer != null && this.drawer.visible ? this.drawer.now : null);
+	}
+
+	/** O botao esta escondido na gaveta "..."? */
+	public boolean debugInDrawer(String id) {
+		return this.buttons.inDrawer(id);
+	}
+
+	public RecipeBookPanel debugGrimoire() {
+		if (!grimoireOpen) toggleGrimoire();
+		return this.grimoire;
+	}
+
+	/** Clica em "+ Salvar o que estou vestindo" (abre a janela de conjuntos se preciso). Devolve a altura da janela. */
+	public int debugSaveArmorSet() {
+		if (!armorOpen) toggleArmor();
+		this.armorList.debugSaveCurrent(this.armor.rect);
+		return this.armor.rect.h();
 	}
 
 	/** Retangulo do alfinete (pin) de uma linha da lista de comandos. */
@@ -252,7 +353,7 @@ public class IsekaiInventoryScreen extends IsekaiMenuScreen<InventoryMenu> {
 	}
 
 	public int debugButtonCount() {
-		return this.buttons.size();
+		return this.buttons.barEntries().size();
 	}
 
 	// ------------------------------------------------------------------ acoes
@@ -278,7 +379,10 @@ public class IsekaiInventoryScreen extends IsekaiMenuScreen<InventoryMenu> {
 
 	private void toggleCommands() {
 		commandsOpen = !commandsOpen;
-		if (commandsOpen) armorOpen = false;
+		if (commandsOpen) {
+			armorOpen = false;
+			grimoireOpen = false;
+		}
 		this.commandsAppearAt = time();
 		UiSounds.toggle();
 		this.rebuildWidgets();
@@ -286,10 +390,54 @@ public class IsekaiInventoryScreen extends IsekaiMenuScreen<InventoryMenu> {
 
 	private void toggleArmor() {
 		armorOpen = !armorOpen;
-		if (armorOpen) commandsOpen = false;
+		if (armorOpen) {
+			commandsOpen = false;
+			grimoireOpen = false;
+		}
 		this.armorAppearAt = time();
 		UiSounds.toggle();
 		this.rebuildWidgets();
+	}
+
+	private void toggleGrimoire() {
+		grimoireOpen = !grimoireOpen;
+		if (grimoireOpen) {
+			commandsOpen = false;
+			armorOpen = false;
+		}
+		this.grimoireAppearAt = time();
+		UiSounds.toggle();
+		this.rebuildWidgets();
+	}
+
+	private void toggleDrawer() {
+		ButtonBar.drawerOpen = !ButtonBar.drawerOpen;
+		this.drawerAppearAt = time();
+		UiSounds.toggle();
+		this.rebuildWidgets();
+	}
+
+	private void closeDrawer() {
+		ButtonBar.drawerOpen = false;
+		if (this.drawer != null) this.drawer.visible = false;
+	}
+
+	/** Fecha o inventario (o servidor devolve o que estava na grade/mao) e abre outra tela. */
+	private void leaveTo(Runnable open) {
+		if (isClosing()) return;
+		if (this.minecraft.player != null) this.minecraft.player.closeContainer();
+		open.run();
+	}
+
+	private void openSettings() {
+		Player p = this.owner;
+		leaveTo(() -> this.minecraft.setScreen(new SettingsScreen(new InventoryScreen(p))));
+	}
+
+	/** Botao de roupas: abre o menu do Customizable Player Models (volta para o inventario ao fechar). */
+	private void openCpm() {
+		Player p = this.owner;
+		leaveTo(() -> CpmBridge.open(this.minecraft, new InventoryScreen(p)));
 	}
 
 	/** Fecha o inventario e da um clique direito no bau que ainda esta na mira (o mesmo que fazer a mao). */
@@ -331,7 +479,10 @@ public class IsekaiInventoryScreen extends IsekaiMenuScreen<InventoryMenu> {
 		} else if (p == this.mini) {
 			drawMinimap(g, p, partialTick, mouseX, mouseY);
 		} else if (p == this.bar) {
-			drawBar(g, p, mouseX, mouseY);
+			boolean canHover = !isClosing() && !isDraggingPanel() && overlayAt(mouseX, mouseY) == null;
+			this.buttons.drawBar(g, p.now, p.alpha > 0f ? 1f : 0f, p.progress, mouseX, mouseY, canHover);
+		} else if (p == this.drawer) {
+			this.buttons.drawDrawer(g, p.now, p.alpha, mouseX, mouseY, !isClosing() && overlayAt(mouseX, mouseY) == p);
 		} else if (p == this.commands) {
 			this.commandList.draw(g, p.now, p.alpha, mouseX, mouseY, partialTick, !isClosing() && !isDraggingPanel());
 		} else if (p == this.armor) {
@@ -367,30 +518,12 @@ public class IsekaiInventoryScreen extends IsekaiMenuScreen<InventoryMenu> {
 		}
 	}
 
-	private Rect buttonRect(Rect barRect, int i) {
-		return new Rect(barRect.x() + i * InventoryLayout.BUTTON_STEP, barRect.y() + 1, InventoryLayout.HEX_W, InventoryLayout.HEX_H);
-	}
-
-	private void drawBar(GuiGraphics g, Panel p, int mouseX, int mouseY) {
-		int before = this.hoveredButton;
-		this.hoveredButton = -1;
-		boolean canHover = !isClosing() && !isDraggingPanel() && overlayAt(mouseX, mouseY) == null;
-		for (int i = 0; i < this.buttons.size(); i++) {
-			float pi = Ease.clamp01(p.progress * 1.4f - i * 0.12f);
-			Rect b = buttonRect(p.now, i).offset(0, slide(pi, 10));
-			boolean hover = canHover && buttonRect(p.now, i).contains(mouseX, mouseY);
-			if (hover) this.hoveredButton = i;
-			BarButton bb = this.buttons.get(i);
-			Panels.hexButton(g, b, bb.icon(), hover, bb.on(), fade(pi) * (p.alpha > 0 ? 1f : 0f));
-		}
-		if (this.hoveredButton >= 0 && this.hoveredButton != before) UiSounds.hover();
-	}
-
 	@Override
 	protected void renderOverlay(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
 		if (isClosing() || isDraggingPanel()) return;
-		if (this.hoveredButton >= 0 && this.hoveredButton < this.buttons.size()) {
-			this.setTooltipForNextRenderPass(this.buttons.get(this.hoveredButton).tooltip());
+		Component barTip = this.buttons.tooltip(this.drawer != null && this.drawer.visible);
+		if (barTip != null && (this.buttons.hoveringBar() || overlayAt(mouseX, mouseY) == this.drawer)) {
+			this.setTooltipForNextRenderPass(barTip);
 		} else if (this.miniHovered) {
 			this.setTooltipForNextRenderPass(Component.translatable("isekai_ui.map.open_hint", IsekaiKeys.mapKeyName()));
 		} else if (this.commands != null && this.commands.visible && this.commandList.tooltip() != null
@@ -426,19 +559,25 @@ public class IsekaiInventoryScreen extends IsekaiMenuScreen<InventoryMenu> {
 			openMap();
 			return true;
 		}
-		if (p == this.bar && button == 0) {
-			for (int i = 0; i < this.buttons.size(); i++) {
-				if (buttonRect(p.now, i).contains(mouseX, mouseY)) {
-					UiSounds.click();
-					this.buttons.get(i).action().run();
-					return true;
-				}
-			}
-			return false;
+		if (p == this.bar && button == 0) return this.buttons.clickBar(p.now, mouseX, mouseY);
+		if (p == this.drawer) {
+			if (button == 0) this.buttons.clickDrawer(p.now, mouseX, mouseY, this::closeDrawer);
+			return true;
 		}
 		if (p == this.commands) return this.commandList.click(p.now, mouseX, mouseY, button);
 		if (p == this.armor) return this.armorList.click(p.now, mouseX, mouseY, button);
 		return false;
+	}
+
+	@Override
+	public boolean mouseClicked(double mouseX, double mouseY, int button) {
+		// clicar fora da gaveta fecha a gaveta (o clique continua valendo para o que estiver embaixo)
+		if (ButtonBar.drawerOpen && this.drawer != null && this.drawer.visible && !isClosing()) {
+			Rect more = this.buttons.find(ButtonBar.MORE, this.bar.now, null);
+			boolean onMore = more != null && more.contains(mouseX, mouseY);
+			if (!onMore && !this.drawer.grabArea().contains(mouseX, mouseY)) closeDrawer();
+		}
+		return super.mouseClicked(mouseX, mouseY, button);
 	}
 
 	@Override
@@ -455,6 +594,8 @@ public class IsekaiInventoryScreen extends IsekaiMenuScreen<InventoryMenu> {
 	@Override
 	public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
 		if (isClosing()) return true;
+		PanelContent typing = typingContent();
+		if (typing != null) return typing.keyPressed(keyCode, scanCode, modifiers);
 		if (this.commandList != null && this.commandList.isTyping()) return this.commandList.keyPressed(keyCode, scanCode, modifiers);
 		if (this.armorList != null && this.armorList.isTyping()) return this.armorList.keyPressed(keyCode, scanCode, modifiers);
 		if (IsekaiKeys.isMapKey(keyCode, scanCode)) {

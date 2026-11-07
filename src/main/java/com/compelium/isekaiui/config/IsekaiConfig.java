@@ -50,7 +50,15 @@ public final class IsekaiConfig {
 	public float characterScreenX = 0.24f;
 	public boolean animations = true;
 	public boolean uiSounds = true;
+	/** Volume geral dos sons da interface (0 a 1). */
 	public float uiSoundVolume = 0.7f;
+	/** Volume do som de abrir/fechar janelas e o mapa (0 a 1), multiplicado pelo volume geral. */
+	public float windowSoundVolume = 1.0f;
+	/** Volume dos cliques, passar o mouse e botoes (0 a 1), multiplicado pelo volume geral. */
+	public float clickSoundVolume = 1.0f;
+
+	public BarSettings bar = new BarSettings();
+	public RecipeSettings recipes = new RecipeSettings();
 
 	public MapSettings map = new MapSettings();
 	public String _layoutsInfo = "Posicoes das janelas arrastadas (0 = esquerda/topo, 1 = direita/baixo). Apague para voltar ao padrao.";
@@ -100,13 +108,30 @@ public final class IsekaiConfig {
 	}
 
 	public static final class InstrumentSettings {
-		public String _info = "Relogio e bussola: sem relogio o minimapa mostra so o sol/lua, com relogio mostra a hora. A bussola libera as coordenadas e o minimapa durante o jogo; segurando a bussola os marcadores aparecem no horizonte. hudCorner: top_left, top_right, bottom_left ou bottom_right.";
+		public String _info = "Relogio e bussola: sem relogio o minimapa mostra so o sol/lua, com relogio mostra a hora. A bussola libera as coordenadas e o minimapa durante o jogo; segurando a bussola os marcadores aparecem no horizonte. hudCorner: top_left, top_right, bottom_left ou bottom_right. hudX/hudY: posicao escolhida arrastando (0 a 1; -1 = usar o canto).";
 		public boolean requireClock = true;
 		public boolean requireCompass = true;
 		public boolean hudMinimap = true;
 		public String hudCorner = "top_left";
+		public float hudX = -1f;
+		public float hudY = -1f;
 		public int hudSize = 84;
 		public boolean horizonMarkers = true;
+	}
+
+	public static final class BarSettings {
+		public String _info = "Barra de botoes do inventario: ordem, botoes escondidos e quantos cabem antes de ir para a gaveta (...). Ids: map, camera, commands, armor, grimoire, cpm, chest, settings, trash, classic, pin:<comando>, cfg:<numero>.";
+		/** Quantos botoes ficam na barra; o resto vai para a gaveta "...". */
+		public int maxVisible = 8;
+		public List<String> order = new ArrayList<>();
+		public List<String> hidden = new ArrayList<>();
+	}
+
+	public static final class RecipeSettings {
+		/** Mostra tambem as receitas que o servidor manda e que ainda nao foram testadas (com "?"). */
+		public boolean showUntested = false;
+		/** Avisinho na tela quando uma receita nova e anotada. */
+		public boolean notifyLearned = true;
 	}
 
 	public static final class MenuButton {
@@ -161,6 +186,16 @@ public final class IsekaiConfig {
 		if (map.shareFormat == null || map.shareFormat.isBlank()) map.shareFormat = "xaero";
 		if (instruments == null) instruments = new InstrumentSettings();
 		if (instruments.hudCorner == null) instruments.hudCorner = "top_left";
+		if (bar == null) bar = new BarSettings();
+		if (bar.order == null) bar.order = new ArrayList<>();
+		if (bar.hidden == null) bar.hidden = new ArrayList<>();
+		bar.maxVisible = clamp(bar.maxVisible, 3, 14);
+		if (recipes == null) recipes = new RecipeSettings();
+		instruments.hudSize = clamp(instruments.hudSize, 48, 160);
+		if (instruments.hudX > 1f) instruments.hudX = 1f;
+		if (instruments.hudY > 1f) instruments.hudY = 1f;
+		windowSoundVolume = clamp(windowSoundVolume, 0f, 1f);
+		clickSoundVolume = clamp(clickSoundVolume, 0f, 1f);
 		map.exploreRadiusChunks = clamp(map.exploreRadiusChunks, 1, 16);
 		map.minimapZoom = clamp(map.minimapZoom, 0.25f, 4f);
 		map.mapZoom = clamp(map.mapZoom, 0.0625f, 6f);

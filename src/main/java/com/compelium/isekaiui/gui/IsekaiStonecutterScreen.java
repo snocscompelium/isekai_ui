@@ -131,7 +131,7 @@ public class IsekaiStonecutterScreen extends IsekaiStationScreen<StonecutterMenu
 
 	@Override
 	public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
-		if (this.station != null && this.station.now.contains(mouseX, mouseY) && maxScroll() > 0) {
+		if (this.station != null && this.station.now.contains(mouseX, mouseY) && overlayAt(mouseX, mouseY) == null && maxScroll() > 0) {
 			this.scrollRow = Mth.clamp(this.scrollRow - (int) Math.signum(scrollY), 0, maxScroll());
 			return true;
 		}
@@ -145,5 +145,10 @@ public class IsekaiStonecutterScreen extends IsekaiStationScreen<StonecutterMenu
 		if (this.hovered >= list.size()) return null;
 		ItemStack stack = list.get(this.hovered).recipe().optionDisplay().resolveForFirstStack(SlotDisplayContext.fromLevel(this.minecraft.level));
 		return stack.isEmpty() ? null : List.of(stack.getHoverName());
+	}
+
+	@Override
+	protected RecipeBookPanel.Tab grimoireTab() {
+		return RecipeBookPanel.Tab.STONECUTTING;
 	}
 }

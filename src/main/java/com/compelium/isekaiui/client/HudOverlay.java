@@ -2,9 +2,11 @@ package com.compelium.isekaiui.client;
 
 import com.compelium.isekaiui.config.IsekaiConfig;
 import com.compelium.isekaiui.gui.Draw;
+import com.compelium.isekaiui.gui.HudLayoutScreen;
 import com.compelium.isekaiui.gui.IsekaiMapScreen;
 import com.compelium.isekaiui.gui.IsekaiMenuScreen;
 import com.compelium.isekaiui.gui.Rect;
+import com.compelium.isekaiui.gui.SettingsScreen;
 import com.compelium.isekaiui.gui.SkyDial;
 import com.compelium.isekaiui.gui.Theme;
 import com.compelium.isekaiui.lands.LandsTracker;
@@ -34,46 +36,77 @@ public final class HudOverlay {
 	private HudOverlay() {
 	}
 
+	/** Altura reservada embaixo do minimapa para o nome do territorio e as coordenadas. */
+	public static final int LABELS_H = 22;
+	private static final int MARGIN = 11;
+
 	public static void render(GuiGraphics g, DeltaTracker delta) {
 		Minecraft mc = Minecraft.getInstance();
 		LocalPlayer p = mc.player;
 		if (p == null || mc.level == null || mc.options.hideGui || mc.getDebugOverlay().showDebugScreen()) return;
-		if (mc.screen instanceof IsekaiMenuScreen<?> || mc.screen instanceof IsekaiMapScreen) return;
+		if (mc.screen instanceof IsekaiMenuScreen<?> || mc.screen instanceof IsekaiMapScreen
+				|| mc.screen instanceof SettingsScreen || mc.screen instanceof HudLayoutScreen) return;
 		IsekaiConfig.InstrumentSettings cfg = IsekaiConfig.get().instruments;
 		float pt = delta.getGameTimeDeltaPartialTick(false);
 		if (cfg.horizonMarkers && Instruments.holdingCompass()) horizon(g, mc, pt);
-		if (cfg.hudMinimap && Instruments.hasCompass()) minimap(g, mc, p, cfg, pt);
+		if (cfg.hudMinimap && Instruments.hasCompass()) {
+			drawMinimap(g, mc, p, minimapRect(g.guiWidth(), g.guiHeight()), pt, 1f);
+		}
 	}
 
-	private static void minimap(GuiGraphics g, Minecraft mc, LocalPlayer p, IsekaiConfig.InstrumentSettings cfg, float pt) {
-		DimMap map = MapManager.current();
-		if (map == null) return;
+	/** Onde fica o mapa (sem a moldura): na posicao arrastada pelo jogador ou no canto escolhido. */
+	public static Rect minimapRect(int W, int H) {
+		IsekaiConfig.InstrumentSettings cfg = IsekaiConfig.get().instruments;
 		int size = Mth.clamp(cfg.hudSize, 48, 160);
-		int margin = 6 + 5;
-		int W = g.guiWidth();
-		int H = g.guiHeight();
+		if (cfg.hudX >= 0f && cfg.hudY >= 0f) {
+			int x = MARGIN + Math.round(Mth.clamp(cfg.hudX, 0f, 1f) * Math.max(0, W - 2 * MARGIN - size));
+			int y = MARGIN + Math.round(Mth.clamp(cfg.hudY, 0f, 1f) * Math.max(0, H - 2 * MARGIN - size - LABELS_H));
+			return new Rect(x, y, size, size);
+		}
 		String corner = cfg.hudCorner == null ? "top_left" : cfg.hudCorner;
 		boolean right = corner.endsWith("right");
 		boolean bottom = corner.startsWith("bottom");
-		int x = right ? W - margin - size : margin;
-		int y = bottom ? H - margin - size - 22 : margin;
-		Rect r = new Rect(x, y, size, size);
-		VIEW.cx = Mth.lerp(pt, p.xo, p.getX());
-		VIEW.cz = Mth.lerp(pt, p.zo, p.getZ());
-		VIEW.zoom = IsekaiConfig.get().map.minimapZoom;
-		Draw.fill(g, r.x() - 2, r.y() + 3, r.right() + 6, r.bottom() + 9, Theme.SHADOW);
-		MapRenderer.draw(g, map, VIEW, r, 1f, pt, true);
-		Draw.sprite(g, Theme.MAP_FRAME, r.x() - 5, r.y() - 5, r.w() + 10, r.h() + 10, 1f);
-		SkyDial.draw(g, mc.font, right ? r.x() + 1 : r.right() - 1, r.y() + 1, 1f);
-		BlockPos bp = p.blockPosition();
-		Component coords = Component.literal("X " + bp.getX() + "  Y " + bp.getY() + "  Z " + bp.getZ());
+		int x = right ? W - MARGIN - size : MARGIN;
+		int y = bottom ? H - MARGIN - size - LABELS_H : MARGIN;
+		return new Rect(x, y, size, size);
+	}
+
+	/** Converte um canto superior-esquerdo arrastado para a posicao salva (0 a 1). */
+	public static void savePosition(int x, int y, int W, int H) {
+		IsekaiConfig.InstrumentSettings cfg = IsekaiConfig.get().instruments;
+		int size = Mth.clamp(cfg.hudSize, 48, 160);
+		int freeX = Math.max(1, W - 2 * MARGIN - size);
+		int freeY = Math.max(1, H - 2 * MARGIN - size - LABELS_H);
+		cfg.hudX = Mth.clamp((x - MARGIN) / (float) freeX, 0f, 1f);
+		cfg.hudY = Mth.clamp((y - MARGIN) / (float) freeY, 0f, 1f);
+	}
+
+	/** Desenha o minimapa do HUD em r (tambem usado pela tela de posicionar, mesmo sem bussola). */
+	public static void drawMinimap(GuiGraphics g, Minecraft mc, LocalPlayer p, Rect r, float pt, float alpha) {
+		DimMap map = MapManager.current();
+		boolean dialLeft = r.cx() > g.guiWidth() / 2;
+		Draw.fill(g, r.x() - 2, r.y() + 3, r.right() + 6, r.bottom() + 9, Draw.alpha(Theme.SHADOW, alpha));
+		if (map != null && p != null) {
+			VIEW.cx = Mth.lerp(pt, p.xo, p.getX());
+			VIEW.cz = Mth.lerp(pt, p.zo, p.getZ());
+			VIEW.zoom = IsekaiConfig.get().map.minimapZoom;
+			MapRenderer.draw(g, map, VIEW, r, alpha, pt, true);
+		} else {
+			Draw.fill(g, r.x(), r.y(), r.right(), r.bottom(), Draw.alpha(0xFFE3D3A8, alpha));
+		}
+		Draw.sprite(g, Theme.MAP_FRAME, r.x() - 5, r.y() - 5, r.w() + 10, r.h() + 10, alpha);
+		SkyDial.draw(g, mc.font, dialLeft ? r.x() + 1 : r.right() - 1, r.y() + 1, alpha);
 		int ty = r.bottom() + 7;
 		String land = LandsTracker.currentLand();
 		if (land != null) {
-			Draw.textCentered(g, mc.font, Component.literal(land), r.cx(), ty, 0xFF000000 | Theme.landColor(land), true);
+			Draw.textCentered(g, mc.font, Component.literal(land), r.cx(), ty, Draw.alpha(0xFF000000 | Theme.landColor(land), alpha), true);
 			ty += 10;
 		}
-		Draw.textCentered(g, mc.font, coords, r.cx(), ty, Theme.TEXT, true);
+		if (p != null) {
+			BlockPos bp = p.blockPosition();
+			Component coords = Component.literal("X " + bp.getX() + "  Y " + bp.getY() + "  Z " + bp.getZ());
+			Draw.textCentered(g, mc.font, coords, r.cx(), ty, Draw.alpha(Theme.TEXT, alpha), true);
+		}
 	}
 
 	/** Marcadores no horizonte: cada marcador aparece na direcao em que esta, com o nome e a distancia. */

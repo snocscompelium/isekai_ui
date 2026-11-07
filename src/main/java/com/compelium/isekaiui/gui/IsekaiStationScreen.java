@@ -1,6 +1,8 @@
 package com.compelium.isekaiui.gui;
 
+import com.compelium.isekaiui.client.UiSounds;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
@@ -19,12 +21,18 @@ public abstract class IsekaiStationScreen<T extends AbstractContainerMenu> exten
 	protected static final int BAG_W = 9 * SLOT + InventoryLayout.PAD * 2;
 	protected static final int BAG_H = 8 + 3 * SLOT + 9 + 30 + 7;
 	private static final int SIDE_BUTTONS_W = InventoryLayout.HEX_W + 4;
+	private static final int GRIMOIRE_GAP = 8;
 	private static boolean vanillaBypass;
+	/** Grimorio aberto nas estacoes (lembrado entre uma estacao e outra). */
+	private static boolean grimoireOpen;
 
 	protected final Screen vanilla;
 	private final String key;
 	protected Panel station;
 	protected Panel bag;
+	protected Panel grimoirePanel;
+	private RecipeBookPanel grimoire;
+	private float grimoireAppearAt;
 
 	protected IsekaiStationScreen(T menu, Inventory inventory, Component title, Screen vanilla, String key) {
 		super(menu, inventory, title);
@@ -71,6 +79,11 @@ public abstract class IsekaiStationScreen<T extends AbstractContainerMenu> exten
 		return this.title;
 	}
 
+	/** Aba do grimorio de receitas desta estacao (null = estacao sem grimorio). */
+	protected RecipeBookPanel.Tab grimoireTab() {
+		return null;
+	}
+
 	// ------------------------------------------------------------------ layout
 
 	@Override
@@ -80,26 +93,31 @@ public abstract class IsekaiStationScreen<T extends AbstractContainerMenu> exten
 
 	@Override
 	protected boolean screenFits() {
-		return this.menu.slots.size() >= stationSlots() + 36 && layout(this.width, this.height) != null;
+		return this.menu.slots.size() >= stationSlots() + 36 && layout(this.width, this.height, 0) != null;
 	}
 
-	/** Estacao em cima e inventario embaixo (ou lado a lado em telas baixas); null se nao couber. */
-	private Rect[] layout(int W, int H) {
+	/**
+	 * Estacao em cima e inventario embaixo (ou lado a lado em telas baixas); null se nao couber.
+	 * "reserve" = espaco livre a esquerda (grimorio aberto ao lado, como o livro de receitas do jogo).
+	 */
+	private Rect[] layout(int W, int H, int reserve) {
 		int sw = stationW();
 		int sh = stationH();
 		int tab = InventoryLayout.TAB;
 		int colW = Math.max(sw, BAG_W);
 		int stacked = tab + sh + 10 + tab + BAG_H;
-		if (stacked <= H - 10 && colW + SIDE_BUTTONS_W + 12 <= W) {
-			int x = InventoryLayout.mainColumnX(W, colW, colW + SIDE_BUTTONS_W);
+		if (stacked <= H - 10 && reserve + colW + SIDE_BUTTONS_W + 12 <= W) {
+			int x = reserve > 0 ? Math.max(6 + reserve, (W - (reserve + colW + SIDE_BUTTONS_W)) / 2 + reserve)
+					: InventoryLayout.mainColumnX(W, colW, colW + SIDE_BUTTONS_W);
 			int top = (H - stacked) / 2 + tab;
 			Rect s = new Rect(x + (colW - sw) / 2, top, sw, sh);
 			Rect b = new Rect(x + (colW - BAG_W) / 2, top + sh + 10 + tab, BAG_W, BAG_H);
 			return new Rect[]{s, b};
 		}
 		int pairW = sw + SIDE_BUTTONS_W + 8 + BAG_W;
-		if (pairW + 12 <= W && Math.max(sh, BAG_H) + tab + 8 <= H) {
-			int x = Mth.clamp(InventoryLayout.mainColumnX(W, pairW, pairW), 6, W - 6 - pairW);
+		if (reserve + pairW + 12 <= W && Math.max(sh, BAG_H) + tab + 8 <= H) {
+			int x = reserve > 0 ? Math.max(6 + reserve, (W - (reserve + pairW)) / 2 + reserve)
+					: Mth.clamp(InventoryLayout.mainColumnX(W, pairW, pairW), 6, W - 6 - pairW);
 			Rect s = new Rect(x, Math.max(tab + 4, (H - sh) / 2), sw, sh);
 			Rect b = new Rect(x + sw + SIDE_BUTTONS_W + 8, Math.max(tab + 4, (H - BAG_H) / 2), BAG_W, BAG_H);
 			return new Rect[]{s, b};
@@ -115,11 +133,76 @@ public abstract class IsekaiStationScreen<T extends AbstractContainerMenu> exten
 
 	@Override
 	protected void createPanels() {
-		Rect[] l = layout(this.width, this.height);
+		RecipeBookPanel.Tab tab = grimoireTab();
+		boolean book = tab != null && grimoireOpen;
+		Rect[] l = book ? layout(this.width, this.height, RecipeBookPanel.W + GRIMOIRE_GAP) : null;
+		boolean beside = l != null;
+		if (l == null) l = layout(this.width, this.height, 0);
 		if (l == null) return;
 		this.station = addPanel("station", 0f, 0, -20, true, stationTitle(), l[0]);
 		this.bag = addPanel("bag", 0.08f, 0, 22, true, Component.translatable("isekai_ui.panel.inventory"), l[1]);
+		this.grimoirePanel = null;
+		if (tab != null) {
+			addSideButton(this.station, "book", Component.translatable("isekai_ui.button.grimoire"), this::toggleGrimoire, () -> grimoireOpen);
+			if (book) createGrimoire(tab, l, beside);
+		}
 		addStationButtons();
+	}
+
+	/** Grimorio ao lado da estacao quando cabe; senao por cima da bolsa (os ingredientes sao colocados sozinhos). */
+	private void createGrimoire(RecipeBookPanel.Tab tab, Rect[] l, boolean beside) {
+		if (this.grimoire == null) this.grimoire = new RecipeBookPanel(this.font, new RecipeBookPanel.Host() {
+			@Override
+			public AbstractContainerMenu menu() {
+				return IsekaiStationScreen.this.menu;
+			}
+
+			@Override
+			public void addInput(EditBox box) {
+				addWidget(box);
+			}
+
+			@Override
+			public void focusInput(EditBox box) {
+				setFocused(box);
+			}
+
+			@Override
+			public void blurInput() {
+				setFocused(null);
+			}
+		}, tab);
+		this.grimoire.attach();
+		int gw = RecipeBookPanel.W;
+		int gh = RecipeBookPanel.H;
+		Rect r;
+		if (beside) {
+			int left = Math.min(l[0].x(), l[1].x());
+			r = new Rect(left - GRIMOIRE_GAP - gw, l[0].y(), gw, gh);
+		} else {
+			Rect b = l[1];
+			int top = InventoryLayout.TAB + 1;
+			r = new Rect(Mth.clamp(b.cx() - gw / 2, 4, Math.max(4, this.width - gw - 4)),
+					Mth.clamp(b.y(), top, Math.max(top, this.height - gh - 1)), gw, gh);
+		}
+		this.grimoirePanel = addPanel("grimoire", this.grimoireAppearAt, beside ? -20 : 0, beside ? 0 : 10, true,
+				Component.translatable("isekai_ui.panel.grimoire"), r);
+		this.grimoirePanel.overlay = !beside;
+		this.grimoirePanel.content = this.grimoire;
+	}
+
+	private void toggleGrimoire() {
+		grimoireOpen = !grimoireOpen;
+		this.grimoireAppearAt = time();
+		UiSounds.toggle();
+		rebuildWidgets();
+	}
+
+	/** Usado pelos testes automaticos: abre o grimorio (se preciso) e devolve a janela dele. */
+	public RecipeBookPanel debugGrimoire() {
+		if (grimoireTab() == null) return null;
+		if (!grimoireOpen) toggleGrimoire();
+		return this.grimoire;
 	}
 
 	@Override
@@ -166,7 +249,7 @@ public abstract class IsekaiStationScreen<T extends AbstractContainerMenu> exten
 	@Override
 	protected void renderOverlay(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
 		if (isClosing() || isDraggingPanel() || this.station == null || this.hoveredSlot != null) return;
-		if (!this.station.grabArea().contains(mouseX, mouseY)) return;
+		if (!this.station.grabArea().contains(mouseX, mouseY) || overlayAt(mouseX, mouseY) != null) return;
 		List<Component> lines = stationTooltip(this.station.now, mouseX, mouseY);
 		if (lines != null && !lines.isEmpty()) g.renderComponentTooltip(this.font, lines, mouseX, mouseY);
 	}

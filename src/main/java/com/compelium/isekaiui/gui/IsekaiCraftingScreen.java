@@ -5,9 +5,8 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.CraftingMenu;
-import net.minecraft.world.inventory.RecipeBookType;
 
-/** Mesa de trabalho: grade 3x3, seta e resultado. O livro de receitas abre a tela vanilla. */
+/** Mesa de trabalho: grade 3x3, seta e resultado. O botao de livro abre o grimorio de receitas. */
 public class IsekaiCraftingScreen extends IsekaiStationScreen<CraftingMenu> {
 	private static final int W = 9 + 3 * SLOT + 8 + 22 + 8 + 26 + 9;
 	private static final int H = 9 + 3 * SLOT + 9;
@@ -62,12 +61,7 @@ public class IsekaiCraftingScreen extends IsekaiStationScreen<CraftingMenu> {
 	}
 
 	@Override
-	protected void addStationButtons() {
-		addSideButton(this.station, "book", Component.translatable("isekai_ui.button.recipe_book"), this::openRecipeBook, () -> false);
-	}
-
-	private void openRecipeBook() {
-		if (this.minecraft.player != null) this.minecraft.player.getRecipeBook().setOpen(RecipeBookType.CRAFTING, true);
-		openVanillaFallback();
+	protected RecipeBookPanel.Tab grimoireTab() {
+		return RecipeBookPanel.Tab.CRAFTING;
 	}
 }

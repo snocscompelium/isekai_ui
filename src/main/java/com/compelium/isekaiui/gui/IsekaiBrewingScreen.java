@@ -89,4 +89,9 @@ public class IsekaiBrewingScreen extends IsekaiStationScreen<BrewingStandMenu> {
 		if (bar.contains(mouseX, mouseY)) return List.of(Component.translatable("isekai_ui.station.blaze_charges", this.menu.getFuel()));
 		return null;
 	}
+
+	@Override
+	protected RecipeBookPanel.Tab grimoireTab() {
+		return RecipeBookPanel.Tab.BREWING;
+	}
 }

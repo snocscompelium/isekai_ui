@@ -35,6 +35,10 @@ public abstract class IsekaiMenuScreen<T extends AbstractContainerMenu> extends 
 	/** Fundo quase opaco atras de janelas que ficam por cima de outras (o vidro normal e translucido). */
 	public static final int OVERLAY_BACKDROP = 0xEE16131D;
 	private static final float TOP_LAYER = 320f;
+	/** Cada janela por cima fica numa camada propria (os itens de uma nao vazam na outra). */
+	private static final float OVERLAY_STEP = 300f;
+	/** Dicas (tooltips) ficam acima de todas as janelas e dos itens delas. */
+	private static final float TIP_LAYER = 1700f;
 
 	/** Botao hexagonal preso no lado direito de uma janela (anda junto quando ela e arrastada). */
 	public record SideButton(Panel panel, String icon, Component tooltip, Runnable action, BooleanSupplier on) {
@@ -42,6 +46,42 @@ public abstract class IsekaiMenuScreen<T extends AbstractContainerMenu> extends 
 
 	protected final List<SideButton> sideButtons = new ArrayList<>();
 	private SideButton hoveredSide;
+
+	/** Conteudo de uma janela que se desenha e trata cliques sozinho (ex.: grimorio de receitas). */
+	public interface PanelContent {
+		void draw(GuiGraphics g, Rect r, float alpha, int mouseX, int mouseY, float partialTick, boolean canHover);
+
+		default boolean click(Rect r, double mouseX, double mouseY, int button) {
+			return false;
+		}
+
+		default boolean scroll(Rect r, double mouseX, double mouseY, double amount) {
+			return false;
+		}
+
+		default boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+			return false;
+		}
+
+		default boolean isTyping() {
+			return false;
+		}
+
+		/** O jogador clicou fora desta janela (ex.: tirar o foco da busca). */
+		default void clickedOutside() {
+		}
+
+		/** Desenha a dica do que esta embaixo do mouse (por cima de tudo). Devolve true se desenhou. */
+		default boolean renderTooltip(GuiGraphics g, int mouseX, int mouseY) {
+			return false;
+		}
+	}
+
+	/** Avisinho no alto da tela (ex.: "Receita anotada no grimorio"). */
+	private static Component notice;
+	private static long noticeNanos;
+	/** Dica pedida neste quadro (desenhada no fim, por cima de tudo). */
+	private Component pendingTip;
 
 	/** Uma janela da tela. */
 	public static final class Panel {
@@ -64,6 +104,10 @@ public abstract class IsekaiMenuScreen<T extends AbstractContainerMenu> extends 
 		public int padBottom;
 		/** false: a subclasse desenha a(s) aba(s) do titulo (ex.: abas "Catalogo" e "Bau pessoal"). */
 		public boolean drawTitle = true;
+		/** Se tiver, a janela usa este conteudo em vez de drawPanel/onPanelClick. */
+		public PanelContent content;
+		/** Janela presa a outra (ex.: gaveta da barra): nao pode ser arrastada. */
+		public boolean fixed;
 
 		public Panel(String id, float delay, int slideX, int slideY, boolean framed) {
 			this.id = id;
@@ -131,6 +175,28 @@ public abstract class IsekaiMenuScreen<T extends AbstractContainerMenu> extends 
 	/** Clique (sem arrastar) numa area da janela que nao e slot. */
 	protected boolean onPanelClick(Panel p, double mouseX, double mouseY, int button) {
 		return false;
+	}
+
+	/** Mostra um avisinho no alto da tela por alguns segundos (em qualquer tela isekai aberta). */
+	public static void notice(Component text) {
+		notice = text;
+		noticeNanos = System.nanoTime();
+	}
+
+	/** Conteudo de janela que esta digitando agora (ele recebe as teclas antes de tudo). */
+	protected PanelContent typingContent() {
+		for (Panel p : this.panels) {
+			if (p.content != null && p.visible && p.content.isTyping()) return p.content;
+		}
+		return null;
+	}
+
+	private boolean panelClick(Panel p, double mouseX, double mouseY, int button) {
+		if (p.content != null) {
+			p.content.click(p.now, mouseX, mouseY, button);
+			return true;
+		}
+		return onPanelClick(p, mouseX, mouseY, button);
 	}
 
 	/** Ponto da faixa do titulo que e um botao (ex.: aba de modo): clique duplo ali nao reseta a janela. */
@@ -492,16 +558,56 @@ public abstract class IsekaiMenuScreen<T extends AbstractContainerMenu> extends 
 			renderPanelItems(g, dragged);
 			Draw.pop(g);
 		}
+		int layer = 0;
 		for (Panel p : this.panels) {
 			if (!p.overlay || !p.visible || p.alpha <= 0.01f) continue;
 			Draw.push(g);
-			Draw.layer(g, TOP_LAYER);
+			Draw.layer(g, TOP_LAYER + layer * OVERLAY_STEP);
 			drawPanelFull(g, p, partialTick, mouseX, mouseY, time, true);
 			Draw.pop(g);
+			layer++;
 		}
+		// dicas por cima de tudo (inclusive dos itens desenhados dentro das janelas de cima)
+		Draw.push(g);
+		Draw.layer(g, TIP_LAYER);
 		renderOverlay(g, mouseX, mouseY, partialTick);
-		if (this.hoveredSide != null) this.setTooltipForNextRenderPass(this.hoveredSide.tooltip());
-		if (this.closeNanos < 0L && this.pressPanel == null && overlayAt(mouseX, mouseY) == null) this.renderTooltip(g, mouseX, mouseY);
+		Panel over = overlayAt(mouseX, mouseY);
+		Panel under = over != null ? over : panelAt(mouseX, mouseY);
+		boolean contentTip = false;
+		if (under != null && under.content != null && this.closeNanos < 0L && this.pressPanel == null) {
+			contentTip = under.content.renderTooltip(g, mouseX, mouseY);
+		}
+		if (this.hoveredSide != null) this.pendingTip = this.hoveredSide.tooltip();
+		if (this.closeNanos < 0L && this.pressPanel == null && over == null && !contentTip) this.renderTooltip(g, mouseX, mouseY);
+		if (this.pendingTip != null && !contentTip) g.renderTooltip(this.font, this.pendingTip, mouseX, mouseY);
+		this.pendingTip = null;
+		Draw.pop(g);
+		drawNotice(g);
+	}
+
+	/** As dicas das telas isekai sao desenhadas no fim do quadro, acima das janelas (ver render). */
+	@Override
+	public void setTooltipForNextRenderPass(Component tooltip) {
+		this.pendingTip = tooltip;
+	}
+
+	private void drawNotice(GuiGraphics g) {
+		if (notice == null) return;
+		float age = (System.nanoTime() - noticeNanos) / 1_000_000_000f;
+		if (age > 3.5f) {
+			notice = null;
+			return;
+		}
+		float a = Math.min(Math.min(1f, age / 0.15f), Math.min(1f, (3.5f - age) / 0.5f));
+		int w = Math.min(this.width - 20, this.font.width(notice) + 24);
+		int x = (this.width - w) / 2;
+		int y = 3;
+		Draw.push(g);
+		Draw.layer(g, TIP_LAYER + 600f);
+		Draw.sprite(g, Theme.PILL, x, y, w, 14, a);
+		Draw.sprite(g, Theme.icon("book"), x + 4, y + 1, 12, 12, Draw.alpha(Theme.GOLD, a));
+		Draw.textFit(g, this.font, notice, x + w / 2 + 6, y + 3, w - 22, Draw.alpha(Theme.TEXT_GOLD, a), false);
+		Draw.pop(g);
 	}
 
 	/** Coisas por cima de tudo (dicas). */
@@ -537,7 +643,13 @@ public abstract class IsekaiMenuScreen<T extends AbstractContainerMenu> extends 
 			}
 			Panels.panel(g, this.font, p.now, p.alpha, p.progress, p.drawTitle ? p.title : null, time);
 		}
-		drawPanel(g, p, partialTick, mouseX, mouseY);
+		if (p.content != null) {
+			boolean canHover = this.closeNanos < 0L && !this.dragging
+					&& (p.overlay ? overlayAt(mouseX, mouseY) == p : overlayAt(mouseX, mouseY) == null);
+			p.content.draw(g, p.now, p.alpha, mouseX, mouseY, partialTick, canHover);
+		} else {
+			drawPanel(g, p, partialTick, mouseX, mouseY);
+		}
 		drawSideButtons(g, p);
 		if (p == this.pressPanel && this.dragging) {
 			Rect a = p.grabArea();
@@ -588,6 +700,9 @@ public abstract class IsekaiMenuScreen<T extends AbstractContainerMenu> extends 
 	@Override
 	public boolean mouseClicked(double mouseX, double mouseY, int button) {
 		if (this.closeNanos >= 0L) return true;
+		for (Panel p : this.panels) {
+			if (p.content != null && p.visible && !p.grabArea().contains(mouseX, mouseY)) p.content.clickedOutside();
+		}
 		if (button == 0) {
 			SideButton side = sideButtonAt(mouseX, mouseY);
 			if (side != null) {
@@ -609,7 +724,7 @@ public abstract class IsekaiMenuScreen<T extends AbstractContainerMenu> extends 
 					this.dragging = false;
 					return true;
 				}
-				if (onPanelClick(p, mouseX, mouseY, button)) return true;
+				if (panelClick(p, mouseX, mouseY, button)) return true;
 			}
 		}
 		boolean handled = super.mouseClicked(mouseX, mouseY, button);
@@ -620,7 +735,8 @@ public abstract class IsekaiMenuScreen<T extends AbstractContainerMenu> extends 
 	@Override
 	public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
 		if (this.pressPanel != null) {
-			if (!this.dragging && (Math.abs(mouseX - this.pressX) > DRAG_THRESHOLD || Math.abs(mouseY - this.pressY) > DRAG_THRESHOLD)) {
+			if (!this.dragging && !this.pressPanel.fixed
+					&& (Math.abs(mouseX - this.pressX) > DRAG_THRESHOLD || Math.abs(mouseY - this.pressY) > DRAG_THRESHOLD)) {
 				this.dragging = true;
 			}
 			if (this.dragging) {
@@ -647,7 +763,7 @@ public abstract class IsekaiMenuScreen<T extends AbstractContainerMenu> extends 
 				UiSounds.click();
 				return true;
 			}
-			boolean onTab = p.title != null && mouseY < p.now.y() && !isTitleButton(p, mouseX, mouseY);
+			boolean onTab = p.title != null && !p.fixed && mouseY < p.now.y() && !isTitleButton(p, mouseX, mouseY);
 			long now = System.nanoTime();
 			if (onTab && p == this.lastClickPanel && now - this.lastClickNanos < 350_000_000L) {
 				p.rect = clampToScreen(p, p.def);
@@ -658,10 +774,28 @@ public abstract class IsekaiMenuScreen<T extends AbstractContainerMenu> extends 
 			}
 			this.lastClickPanel = p;
 			this.lastClickNanos = now;
-			onPanelClick(p, mouseX, mouseY, button);
+			panelClick(p, mouseX, mouseY, button);
 			return true;
 		}
 		return super.mouseReleased(mouseX, mouseY, button);
+	}
+
+	@Override
+	public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+		Panel over = overlayAt(mouseX, mouseY);
+		Panel under = over != null ? over : panelAt(mouseX, mouseY);
+		if (under != null && under.content != null) {
+			under.content.scroll(under.now, mouseX, mouseY, scrollY);
+			return true;
+		}
+		return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
+	}
+
+	@Override
+	public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+		PanelContent typing = typingContent();
+		if (typing != null) return typing.keyPressed(keyCode, scanCode, modifiers);
+		return super.keyPressed(keyCode, scanCode, modifiers);
 	}
 
 	@Override

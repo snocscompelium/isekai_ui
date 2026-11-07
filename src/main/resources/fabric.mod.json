@@ -17,6 +17,9 @@
 	"entrypoints": {
 		"client": [
 			"com.compelium.isekaiui.IsekaiUI"
+		],
+		"modmenu": [
+			"com.compelium.isekaiui.compat.ModMenuIntegration"
 		]
 	},
 	"mixins": [
