@@ -45,8 +45,9 @@ public class HudLayoutScreen extends Screen {
 		int w = 112;
 		int gap = 8;
 		int total = 2 * w + gap;
-		int x = (this.width - total) / 2 + i * (w + gap);
-		int y = block().y() + 78;
+		Rect b = block();
+		int x = b.cx() - total / 2 + i * (w + gap);
+		int y = b.y() + 78;
 		return new Rect(x, y, w, BUTTON_H);
 	}
 
@@ -63,15 +64,32 @@ public class HudLayoutScreen extends Screen {
 		return Math.min(this.width - 20, w + 24);
 	}
 
-	/** Explicacao + botoes no meio da tela; se o minimapa estiver ali, eles vao para cima ou para baixo. */
+	/** Explicacao + botoes no meio da tela; se o minimapa estiver ali, eles procuram outro lugar livre. */
 	private Rect block() {
 		int w = Math.max(infoWidth(), 2 * 112 + 8);
 		int h = 78 + BUTTON_H;
-		Rect b = new Rect(this.width / 2 - w / 2, this.height / 2 - 44, w, h);
 		Rect m = grabRect().grow(4);
-		boolean hit = b.x() < m.right() && m.x() < b.right() && b.y() - InventoryLayout.TAB < m.bottom() && m.y() < b.bottom();
-		if (hit) b = new Rect(b.x(), m.cy() < this.height / 2 ? this.height - h - 10 : InventoryLayout.TAB + 6, w, h);
-		return b;
+		int cx = this.width / 2 - w / 2;
+		int side = m.cx() > this.width / 2 ? 10 : this.width - w - 10;
+		int mid = this.height / 2 - 44;
+		int top = InventoryLayout.TAB + 6;
+		int bottom = this.height - h - 10;
+		int[][] spots = {{cx, mid}, {side, mid}, {cx, top}, {cx, bottom}, {side, top}, {side, bottom}};
+		Rect best = null;
+		long bestArea = Long.MAX_VALUE;
+		for (int[] spot : spots) {
+			Rect b = new Rect(spot[0], spot[1], w, h);
+			// o lugar que menos cobre o minimapa (de preferencia nada)
+			long ox = Math.max(0, Math.min(b.right(), m.right()) - Math.max(b.x(), m.x()));
+			long oy = Math.max(0, Math.min(b.bottom(), m.bottom()) - Math.max(b.y() - InventoryLayout.TAB, m.y()));
+			long area = ox * oy;
+			if (area < bestArea) {
+				bestArea = area;
+				best = b;
+			}
+			if (area == 0) break;
+		}
+		return best;
 	}
 
 	@Override
@@ -93,10 +111,11 @@ public class HudLayoutScreen extends Screen {
 		dashed(g, box, hover ? Theme.GOLD : 0xC0F2E6C8);
 
 		// explicacao no meio da tela (sai da frente quando o minimapa e arrastado para la)
-		int cx = this.width / 2;
+		Rect block = block();
+		int cx = block.cx();
 		Component[] lines = hints();
 		int w = infoWidth();
-		Rect info = new Rect(cx - w / 2, block().y(), w, 18 + lines.length * 11 + 8);
+		Rect info = new Rect(cx - w / 2, block.y(), w, 18 + lines.length * 11 + 8);
 		Panels.panel(g, this.font, info, 1f, 1f, this.title, 0f);
 		for (int i = 0; i < lines.length; i++) {
 			Draw.textFit(g, this.font, lines[i], cx, info.y() + 9 + i * 11, w - 12, i == 0 ? Theme.TEXT : Theme.TEXT_DIM, false);

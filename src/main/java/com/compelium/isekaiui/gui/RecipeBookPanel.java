@@ -33,9 +33,11 @@ import java.util.Locale;
  * escolhida com o botao "Colocar" (ou "Testar", para as receitas do servidor que ainda nao foram testadas).
  */
 public class RecipeBookPanel implements IsekaiMenuScreen.PanelContent {
-	public static final int W = 246;
 	public static final int H = 160;
-	private static final int COLS = 6;
+	/** Largura da parte de detalhes (grade da receita, botao e dica). */
+	private static final int DETAIL_W = 98;
+	public static final int MAX_COLS = 6;
+	public static final int MIN_COLS = 4;
 	private static final int ROWS = 5;
 	private static final int CELL = 18;
 	private static final long STATUS_NANOS = 3_500_000_000L;
@@ -83,6 +85,8 @@ public class RecipeBookPanel implements IsekaiMenuScreen.PanelContent {
 	private final Font font;
 	private final Host host;
 	private final EditBox search;
+	/** Colunas da lista de receitas (menos colunas em telas pequenas, para o grimorio caber ao lado da estacao). */
+	private int cols = MAX_COLS;
 	private Tab tab;
 	private List<RecipeView> views = List.of();
 	private int learnedCount;
@@ -112,6 +116,20 @@ public class RecipeBookPanel implements IsekaiMenuScreen.PanelContent {
 		this.search.setTextColor(Theme.TEXT);
 		this.search.setHint(Component.translatable("isekai_ui.recipes.search_hint"));
 		this.search.setResponder(t -> this.scroll = 0);
+	}
+
+	/** Largura da janela com "cols" colunas de receitas. */
+	public static int width(int cols) {
+		return 7 + cols * CELL + 13 + DETAIL_W + 7;
+	}
+
+	public int width() {
+		return width(this.cols);
+	}
+
+	public void setColumns(int c) {
+		this.cols = Mth.clamp(c, 3, MAX_COLS);
+		this.scroll = Mth.clamp(this.scroll, 0, maxScroll());
 	}
 
 	/** Chamado a cada init da tela: devolve a caixa de busca para a lista de widgets da tela. */
@@ -181,7 +199,7 @@ public class RecipeBookPanel implements IsekaiMenuScreen.PanelContent {
 	}
 
 	private int maxScroll() {
-		int rows = (this.views.size() + COLS - 1) / COLS;
+		int rows = (this.views.size() + this.cols - 1) / this.cols;
 		return Math.max(0, rows - ROWS);
 	}
 
@@ -195,8 +213,8 @@ public class RecipeBookPanel implements IsekaiMenuScreen.PanelContent {
 		return new Rect(r.right() - 7 - 18, r.y() + 7, 18, 18);
 	}
 
-	private static Rect searchRect(Rect r) {
-		return new Rect(r.x() + 7, r.y() + 29, COLS * CELL + 6, 12);
+	private Rect searchRect(Rect r) {
+		return new Rect(r.x() + 7, r.y() + 29, this.cols * CELL + 6, 12);
 	}
 
 	private static int gridX(Rect r) {
@@ -207,12 +225,12 @@ public class RecipeBookPanel implements IsekaiMenuScreen.PanelContent {
 		return r.y() + 45;
 	}
 
-	private static Rect detail(Rect r) {
-		int x = r.x() + 7 + COLS * CELL + 13;
+	private Rect detail(Rect r) {
+		int x = r.x() + 7 + this.cols * CELL + 13;
 		return new Rect(x, r.y() + 29, r.right() - 7 - x, 106);
 	}
 
-	private static Rect placeRect(Rect r) {
+	private Rect placeRect(Rect r) {
 		Rect d = detail(r);
 		return new Rect(d.x(), d.y() + 72, d.w(), 16);
 	}
@@ -262,10 +280,10 @@ public class RecipeBookPanel implements IsekaiMenuScreen.PanelContent {
 		int gy = gridY(r);
 		this.scroll = Mth.clamp(this.scroll, 0, maxScroll());
 		long now = System.currentTimeMillis();
-		for (int i = 0; i < COLS * ROWS; i++) {
-			int idx = this.scroll * COLS + i;
-			int x = gx + (i % COLS) * CELL;
-			int y = gy + (i / COLS) * CELL;
+		for (int i = 0; i < this.cols * ROWS; i++) {
+			int idx = this.scroll * this.cols + i;
+			int x = gx + (i % this.cols) * CELL;
+			int y = gy + (i / this.cols) * CELL;
 			Draw.sprite(g, Theme.SLOT, x - 1, y - 1, 18, 18, a);
 			if (idx >= this.views.size()) continue;
 			RecipeView v = this.views.get(idx);
@@ -291,7 +309,7 @@ public class RecipeBookPanel implements IsekaiMenuScreen.PanelContent {
 			}
 		}
 		if (maxScroll() > 0) {
-			int trackX = gx + COLS * CELL + 2;
+			int trackX = gx + this.cols * CELL + 2;
 			int trackH = ROWS * CELL - 2;
 			Draw.fill(g, trackX, gy - 1, trackX + 3, gy - 1 + trackH, Draw.alpha(0xFF1A1620, a));
 			int barH = Math.max(8, trackH * ROWS / (ROWS + maxScroll()));
@@ -322,7 +340,7 @@ public class RecipeBookPanel implements IsekaiMenuScreen.PanelContent {
 		} else {
 			int others = this.views.size() - this.learnedCount;
 			line = others > 0 ? Component.translatable("isekai_ui.recipes.count_untested", this.learnedCount, others)
-					: Component.translatable("isekai_ui.recipes.count", this.learnedCount);
+					: Component.translatable(this.learnedCount == 1 ? "isekai_ui.recipes.count_one" : "isekai_ui.recipes.count", this.learnedCount);
 		}
 		Draw.textFit(g, this.font, line, r.cx(), r.bottom() - 14, r.w() - 14, Draw.alpha(color, a), false);
 	}
@@ -462,8 +480,8 @@ public class RecipeBookPanel implements IsekaiMenuScreen.PanelContent {
 		}
 		int gx = gridX(r) - 1;
 		int gy = gridY(r) - 1;
-		if (mouseX >= gx && mouseY >= gy && mouseX < gx + COLS * CELL && mouseY < gy + ROWS * CELL) {
-			int idx = (this.scroll + (int) ((mouseY - gy) / CELL)) * COLS + (int) ((mouseX - gx) / CELL);
+		if (mouseX >= gx && mouseY >= gy && mouseX < gx + this.cols * CELL && mouseY < gy + ROWS * CELL) {
+			int idx = (this.scroll + (int) ((mouseY - gy) / CELL)) * this.cols + (int) ((mouseX - gx) / CELL);
 			if (idx >= 0 && idx < this.views.size()) {
 				this.selected = this.views.get(idx);
 				UiSounds.click();

@@ -130,7 +130,7 @@
 	"isekai_ui.button.settings": "Configurações do Isekai UI",
 	"isekai_ui.creative.trash_hint": "Pegue um item para apagar, ou use Shift + clique para limpar a bolsa",
 	"isekai_ui.creative.clear_confirm": "Shift + clique de novo para limpar a bolsa e a barra",
-	"isekai_ui.creative.cleared": "Bolsa e barra limpas (a armadura e a mão secundária ficaram)",
+	"isekai_ui.creative.cleared": "Bolsa e barra limpas (a armadura ficou)",
 	"isekai_ui.creative.already_empty": "A bolsa e a barra já estão vazias",
 	"isekai_ui.hud_editor.title": "Minimapa da tela",
 	"isekai_ui.hud_editor.hint1": "Arraste o minimapa para onde quiser",
@@ -149,7 +149,7 @@
 	"isekai_ui.recipes.empty": "Nenhuma receita anotada aqui ainda. Faça um item nesta estação e ele aparece no grimório.",
 	"isekai_ui.recipes.nothing": "Nenhuma receita com esse nome",
 	"isekai_ui.recipes.count": "%s receitas anotadas",
-	"isekai_ui.recipes.count_untested": "%s anotadas • %s do servidor sem testar",
+	"isekai_ui.recipes.count_untested": "Anotadas: %s • Do servidor, sem testar: %s",
 	"isekai_ui.recipes.place": "Colocar",
 	"isekai_ui.recipes.test": "Testar",
 	"isekai_ui.recipes.place_tip": "Coloca os ingredientes da bolsa na estação (Shift: o máximo que der)",
@@ -207,7 +207,7 @@
 	"isekai_ui.settings.bar_item_tip": "Olho: mostrar/esconder este botão • Setas: mover para a esquerda ou direita na barra",
 	"isekai_ui.settings.bar_item_locked": "A engrenagem nunca some e nunca vai para o \"...\" (é por ela que você chega aqui)",
 	"isekai_ui.settings.recipes_hint": "O grimório só anota receitas que funcionaram de verdade: o resultado precisa aparecer na bancada ou na estação.",
-	"isekai_ui.settings.recipes_count": "Neste servidor: %s receitas anotadas • %s receitas falsas escondidas",
+	"isekai_ui.settings.recipes_count": "Neste servidor — receitas anotadas: %s • receitas falsas escondidas: %s",
 	"isekai_ui.settings.opt.inventory": "Inventário isekai",
 	"isekai_ui.settings.opt.inventory.tip": "Troca o inventário (tecla E) pela janela de status no estilo isekai.",
 	"isekai_ui.settings.opt.containers": "Baús isekai",
@@ -275,5 +275,6 @@
 	"isekai_ui.settings.opt.notify_learned": "Avisar receita nova",
 	"isekai_ui.settings.opt.notify_learned.tip": "Mostra um avisinho no alto da tela quando uma receita nova é anotada.",
 	"isekai_ui.settings.opt.forget_fakes": "Esquecer receitas falsas",
-	"isekai_ui.settings.opt.forget_fakes.tip": "As receitas do servidor que falharam no teste voltam a aparecer (com \"?\") para testar de novo."
+	"isekai_ui.settings.opt.forget_fakes.tip": "As receitas do servidor que falharam no teste voltam a aparecer (com \"?\") para testar de novo.",
+	"isekai_ui.recipes.count_one": "%s receita anotada"
 }

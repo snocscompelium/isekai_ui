@@ -180,8 +180,9 @@ public class IsekaiInventoryScreen extends IsekaiMenuScreen<InventoryMenu> {
 			}
 		}, RecipeBookPanel.Tab.CRAFTING);
 		this.grimoire.attach();
-		int gx = Mth.clamp(L.main.right() - RecipeBookPanel.W, 4, Math.max(4, this.width - RecipeBookPanel.W - 4));
-		Rect grimoireDef = new Rect(gx, L.bar.y() - 10 - RecipeBookPanel.H, RecipeBookPanel.W, RecipeBookPanel.H);
+		int gw = this.grimoire.width();
+		int gx = Mth.clamp(L.main.right() - gw, 4, Math.max(4, this.width - gw - 4));
+		Rect grimoireDef = new Rect(gx, L.bar.y() - 10 - RecipeBookPanel.H, gw, RecipeBookPanel.H);
 		this.grimoirePanel = addPanel("grimoire", this.grimoireAppearAt, 0, 10, true, Component.translatable("isekai_ui.panel.grimoire"), grimoireDef);
 		this.grimoirePanel.overlay = true;
 		this.grimoirePanel.visible = grimoireOpen;

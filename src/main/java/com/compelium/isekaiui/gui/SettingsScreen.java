@@ -27,7 +27,7 @@ import java.util.function.Supplier;
  * barra do inventario ou pelo Mod Menu. Tudo muda na hora e e salvo em config/isekai_ui.json.
  */
 public class SettingsScreen extends Screen {
-	private static final int NAV_W = 100;
+	private static final int NAV_W = 108;
 	private static final int ROW_H = 18;
 	private static int lastCategory;
 
@@ -205,6 +205,22 @@ public class SettingsScreen extends Screen {
 		return r;
 	}
 
+	/** Nome de uma aba: encolhe um pouco se for comprido (ex.: "Bussola e relogio") e so corta no ultimo caso. */
+	private void navText(GuiGraphics g, Component text, int x, int y, int maxW, int color) {
+		int w = this.font.width(text);
+		if (w <= maxW) {
+			Draw.text(g, this.font, text, x, y, color, false);
+			return;
+		}
+		float s = Math.max(0.7f, maxW / (float) w);
+		Draw.push(g);
+		Draw.translate(g, x, y + (1f - s) * 4f);
+		Draw.scale(g, s);
+		String t = this.font.plainSubstrByWidth(text.getString(), (int) (maxW / s));
+		g.drawString(this.font, t, 0, 0, color, false);
+		Draw.pop(g);
+	}
+
 	private static String percent(double v) {
 		return Math.round(v * 100) + "%";
 	}
@@ -276,8 +292,7 @@ public class SettingsScreen extends Screen {
 			if (sel) Draw.fill(g, n.x(), n.y(), n.x() + 2, n.bottom(), Theme.GOLD);
 			Category c = this.categories.get(i);
 			Draw.sprite(g, Theme.icon(c.icon()), n.x() + 5, n.y() + 3, 12, 12, sel ? Theme.TEXT_GOLD : Theme.IVORY);
-			String name = this.font.plainSubstrByWidth(c.name().getString(), n.w() - 26);
-			Draw.text(g, this.font, Component.literal(name), n.x() + 21, n.y() + 5, sel ? Theme.TEXT_GOLD : Theme.TEXT, false);
+			navText(g, c.name(), n.x() + 21, n.y() + 5, n.w() - 25, sel ? Theme.TEXT_GOLD : Theme.TEXT);
 		}
 		Draw.fill(g, p.x() + NAV_W + 12, p.y() + 8, p.x() + NAV_W + 13, p.bottom() - 32, 0x806E5B3A);
 
@@ -491,16 +506,21 @@ public class SettingsScreen extends Screen {
 		}
 	}
 
-	private static final class Info extends Row {
+	/** Texto explicativo (quebra em quantas linhas precisar). */
+	private final class Info extends Row {
 		private final Component text;
 
 		Info(Component text) {
 			this.text = text;
 		}
 
+		private List<FormattedCharSequence> lines() {
+			return SettingsScreen.this.font.split(this.text, Math.max(40, content().w() - 14));
+		}
+
 		@Override
 		int height() {
-			return 14;
+			return 5 + lines().size() * 10;
 		}
 
 		@Override
@@ -510,7 +530,8 @@ public class SettingsScreen extends Screen {
 
 		@Override
 		void draw(GuiGraphics g, Font font, Rect r, int mouseX, int mouseY, boolean hover) {
-			Draw.textFit(g, font, this.text, r.cx(), r.y() + 3, r.w() - 6, Theme.TEXT_DIM, false);
+			List<FormattedCharSequence> lines = lines();
+			for (int i = 0; i < lines.size(); i++) g.drawString(font, lines.get(i), r.x() + 3, r.y() + 3 + i * 10, Theme.TEXT_DIM, false);
 		}
 	}
 

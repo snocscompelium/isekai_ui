@@ -42,6 +42,8 @@ public final class RecipeObserver {
 	private static ItemStack lastResult = ItemStack.EMPTY;
 	private static long inputsChangedAt;
 	private static long resultChangedAt;
+	/** Esta arrumacao (grade + resultado) ja foi conferida: nao precisa refazer as contas todo tick. */
+	private static boolean handled;
 	private static String lastLearnedKey;
 	// fornalha
 	private static ItemStack furnaceIn = ItemStack.EMPTY;
@@ -101,6 +103,7 @@ public final class RecipeObserver {
 		inputsChangedAt = tick;
 		resultChangedAt = tick;
 		lastLearnedKey = null;
+		handled = false;
 		furnaceKindChangedAt = tick;
 		if (m instanceof AbstractFurnaceMenu) {
 			furnaceIn = m.getSlot(0).getItem().copy();
@@ -117,11 +120,14 @@ public final class RecipeObserver {
 		if (!same(inputs, lastInputs)) {
 			lastInputs = copy(inputs);
 			inputsChangedAt = tick;
+			handled = false;
 		}
 		if (!ItemStack.matches(result, lastResult)) {
 			lastResult = result.copy();
 			resultChangedAt = tick;
+			handled = false;
 		}
+		if (handled) return false;
 		// a grade precisa ficar parada o tempo de ida e volta ao servidor (com folga): assim o resultado que
 		// esta na tela e com certeza a resposta para ESTA grade, e nao para uma arrumacao anterior
 		return tick - resultChangedAt >= STABLE_TICKS && tick - inputsChangedAt >= waitTicks();
@@ -146,6 +152,7 @@ public final class RecipeObserver {
 		for (int i = 0; i < now.length; i++) now[i] = grid.get(i).getItem();
 		ItemStack result = cm.getResultSlot().getItem();
 		if (!stable(now, result) || result.isEmpty()) return;
+		handled = true;
 		int minR = gh, maxR = -1, minC = gw, maxC = -1;
 		for (int r = 0; r < gh; r++) {
 			for (int c = 0; c < gw; c++) {
@@ -172,6 +179,7 @@ public final class RecipeObserver {
 		for (int i = 0; i < inputs; i++) now[i] = m.getSlot(i).getItem();
 		ItemStack result = m.getSlot(resultSlot).getItem();
 		if (!stable(now, result) || result.isEmpty()) return;
+		handled = true;
 		for (ItemStack s : now) if (st == Station.SMITHING && s.isEmpty()) return;
 		// acabamentos decorativos (trims) nao entram: sao combinacoes demais
 		if (st == Station.SMITHING && result.has(DataComponents.TRIM) && !now[1].has(DataComponents.TRIM)) return;

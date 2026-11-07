@@ -62,7 +62,9 @@ public final class InventoryLayout {
 		this.craft = new Rect(rightX, mini.bottom() + 5 + 14 + 8 + TAB, miniS, craftH);
 
 		int barW = Math.max(1, buttons) * BUTTON_STEP - 2;
-		this.bar = new Rect(main.cx() - barW / 2, main.bottom() + 8, barW, 22);
+		// centralizada na bolsa, mas sem encostar na coluna da direita (minimapa/sintese) em telas estreitas
+		int barX = Math.max(4, Math.min(main.cx() - barW / 2, rightX - 6 - barW));
+		this.bar = new Rect(barX, main.bottom() + 8, barW, 22);
 
 		this.storageX = main.x() + PAD + 1;
 		this.storageY = main.y() + 8 + 1;

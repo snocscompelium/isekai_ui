@@ -130,7 +130,7 @@
 	"isekai_ui.button.settings": "Isekai UI settings",
 	"isekai_ui.creative.trash_hint": "Pick up an item to delete it, or Shift + click to clear the bag",
 	"isekai_ui.creative.clear_confirm": "Shift + click again to clear the bag and hotbar",
-	"isekai_ui.creative.cleared": "Bag and hotbar cleared (armor and offhand were kept)",
+	"isekai_ui.creative.cleared": "Bag and hotbar cleared (armor kept)",
 	"isekai_ui.creative.already_empty": "The bag and hotbar are already empty",
 	"isekai_ui.hud_editor.title": "On-screen minimap",
 	"isekai_ui.hud_editor.hint1": "Drag the minimap anywhere you like",
@@ -149,7 +149,7 @@
 	"isekai_ui.recipes.empty": "No recipes written down here yet. Make an item at this station and it shows up in the grimoire.",
 	"isekai_ui.recipes.nothing": "No recipe with that name",
 	"isekai_ui.recipes.count": "%s recipes written down",
-	"isekai_ui.recipes.count_untested": "%s written down • %s from the server, untested",
+	"isekai_ui.recipes.count_untested": "Written down: %s • From the server, untested: %s",
 	"isekai_ui.recipes.place": "Place",
 	"isekai_ui.recipes.test": "Test",
 	"isekai_ui.recipes.place_tip": "Puts the ingredients from your bag into the station (Shift: as many as possible)",
@@ -207,7 +207,7 @@
 	"isekai_ui.settings.bar_item_tip": "Eye: show/hide this button • Arrows: move it left or right on the bar",
 	"isekai_ui.settings.bar_item_locked": "The gear never hides and never goes into \"...\" (it's how you get here)",
 	"isekai_ui.settings.recipes_hint": "The grimoire only writes down recipes that really worked: the result has to show up at the crafting table or station.",
-	"isekai_ui.settings.recipes_count": "On this server: %s recipes written down • %s fake recipes hidden",
+	"isekai_ui.settings.recipes_count": "On this server — recipes written down: %s • fake recipes hidden: %s",
 	"isekai_ui.settings.opt.inventory": "Isekai inventory",
 	"isekai_ui.settings.opt.inventory.tip": "Replaces the inventory (E key) with the isekai-style status window.",
 	"isekai_ui.settings.opt.containers": "Isekai chests",
@@ -275,5 +275,6 @@
 	"isekai_ui.settings.opt.notify_learned": "Announce new recipes",
 	"isekai_ui.settings.opt.notify_learned.tip": "Shows a small notice at the top of the screen when a new recipe is written down.",
 	"isekai_ui.settings.opt.forget_fakes": "Forget fake recipes",
-	"isekai_ui.settings.opt.forget_fakes.tip": "Server recipes that failed the test show up again (with \"?\") to be tested again."
+	"isekai_ui.settings.opt.forget_fakes.tip": "Server recipes that failed the test show up again (with \"?\") to be tested again.",
+	"isekai_ui.recipes.count_one": "%s recipe written down"
 }

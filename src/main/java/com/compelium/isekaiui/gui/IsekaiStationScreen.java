@@ -135,22 +135,31 @@ public abstract class IsekaiStationScreen<T extends AbstractContainerMenu> exten
 	protected void createPanels() {
 		RecipeBookPanel.Tab tab = grimoireTab();
 		boolean book = tab != null && grimoireOpen;
-		Rect[] l = book ? layout(this.width, this.height, RecipeBookPanel.W + GRIMOIRE_GAP) : null;
+		// grimorio ao lado da estacao (como o livro do jogo); em telas menores ele perde colunas para caber
+		Rect[] l = null;
+		int cols = RecipeBookPanel.MAX_COLS;
+		for (int c = RecipeBookPanel.MAX_COLS; book && l == null && c >= RecipeBookPanel.MIN_COLS; c--) {
+			l = layout(this.width, this.height, RecipeBookPanel.width(c) + GRIMOIRE_GAP);
+			cols = c;
+		}
 		boolean beside = l != null;
-		if (l == null) l = layout(this.width, this.height, 0);
+		if (l == null) {
+			cols = RecipeBookPanel.MAX_COLS;
+			l = layout(this.width, this.height, 0);
+		}
 		if (l == null) return;
 		this.station = addPanel("station", 0f, 0, -20, true, stationTitle(), l[0]);
 		this.bag = addPanel("bag", 0.08f, 0, 22, true, Component.translatable("isekai_ui.panel.inventory"), l[1]);
 		this.grimoirePanel = null;
 		if (tab != null) {
 			addSideButton(this.station, "book", Component.translatable("isekai_ui.button.grimoire"), this::toggleGrimoire, () -> grimoireOpen);
-			if (book) createGrimoire(tab, l, beside);
+			if (book) createGrimoire(tab, l, beside, cols);
 		}
 		addStationButtons();
 	}
 
 	/** Grimorio ao lado da estacao quando cabe; senao por cima da bolsa (os ingredientes sao colocados sozinhos). */
-	private void createGrimoire(RecipeBookPanel.Tab tab, Rect[] l, boolean beside) {
+	private void createGrimoire(RecipeBookPanel.Tab tab, Rect[] l, boolean beside, int cols) {
 		if (this.grimoire == null) this.grimoire = new RecipeBookPanel(this.font, new RecipeBookPanel.Host() {
 			@Override
 			public AbstractContainerMenu menu() {
@@ -173,17 +182,19 @@ public abstract class IsekaiStationScreen<T extends AbstractContainerMenu> exten
 			}
 		}, tab);
 		this.grimoire.attach();
-		int gw = RecipeBookPanel.W;
+		this.grimoire.setColumns(cols);
+		int gw = this.grimoire.width();
 		int gh = RecipeBookPanel.H;
 		Rect r;
 		if (beside) {
 			int left = Math.min(l[0].x(), l[1].x());
 			r = new Rect(left - GRIMOIRE_GAP - gw, l[0].y(), gw, gh);
 		} else {
+			// tela pequena demais: por cima da bolsa, sem cobrir a estacao quando der
 			Rect b = l[1];
-			int top = InventoryLayout.TAB + 1;
+			int top = Math.max(InventoryLayout.TAB + 1, l[0].bottom() + 4 + InventoryLayout.TAB);
 			r = new Rect(Mth.clamp(b.cx() - gw / 2, 4, Math.max(4, this.width - gw - 4)),
-					Mth.clamp(b.y(), top, Math.max(top, this.height - gh - 1)), gw, gh);
+					Mth.clamp(b.y(), InventoryLayout.TAB + 1, Math.max(InventoryLayout.TAB + 1, Math.min(this.height - gh - 1, Math.max(top, b.y())))), gw, gh);
 		}
 		this.grimoirePanel = addPanel("grimoire", this.grimoireAppearAt, beside ? -20 : 0, beside ? 0 : 10, true,
 				Component.translatable("isekai_ui.panel.grimoire"), r);
