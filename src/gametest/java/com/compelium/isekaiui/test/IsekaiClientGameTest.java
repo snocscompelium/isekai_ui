@@ -74,6 +74,7 @@ public class IsekaiClientGameTest implements FabricClientGameTest {
 			mc.getLanguageManager().setSelected("pt_br");
 			mc.getLanguageManager().onResourceManagerReload(mc.getResourceManager());
 		});
+		fontScan(ctx);
 		// mundo plano (rapido de gerar no GitHub); o cenario de teste e montado com comandos
 		try (TestSingleplayerContext sp = ctx.worldBuilder().create()) {
 			TestServerContext server = sp.getServer();
@@ -740,6 +741,68 @@ public class IsekaiClientGameTest implements FabricClientGameTest {
 			ctx.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
 			ctx.waitTicks(20);
 		}
+	}
+
+	/** Pesquisa: quais caracteres a fonte do jogo desenha sem nada (para esconder dados no chat e nos livros). */
+	private static void fontScan(ClientGameTestContext ctx) {
+		java.util.List<Integer> thin = new java.util.ArrayList<>();
+		ctx.runOnClient(mc -> {
+			net.minecraft.client.gui.Font f = mc.font;
+			StringBuilder w0 = new StringBuilder();
+			StringBuilder w1 = new StringBuilder();
+			StringBuilder w2 = new StringBuilder();
+			int[][] ranges = {{0x20, 0xFFFF}, {0x10000, 0x1FFFF}, {0xE0000, 0xE01EF}};
+			for (int[] r : ranges) {
+				for (int cp = r[0]; cp <= r[1]; cp++) {
+					if (cp >= 0xD800 && cp <= 0xDFFF) continue;
+					if (cp == 0xA7 || cp == 0x7F) continue;
+					int w = f.width(new String(Character.toChars(cp)));
+					if (w == 0) w0.append(Integer.toHexString(cp)).append(' ');
+					else if (w == 1) {
+						w1.append(Integer.toHexString(cp)).append(' ');
+						thin.add(cp);
+					} else if (w == 2 && cp < 0x3000) w2.append(Integer.toHexString(cp)).append(' ');
+				}
+			}
+			System.out.println("[isekai-font] largura0: " + w0);
+			System.out.println("[isekai-font] largura1 (" + thin.size() + "): " + w1);
+			System.out.println("[isekai-font] largura2 (<3000): " + w2);
+			for (String path : new String[]{"font/include/space.json", "font/default.json", "font/uniform.json", "font/include/default.json"}) {
+				mc.getResourceManager().getResource(net.minecraft.resources.ResourceLocation.withDefaultNamespace(path)).ifPresent(res -> {
+					try (java.io.InputStream in = res.open()) {
+						String txt = new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8).replaceAll("\\s+", " ");
+						System.out.println("[isekai-font] " + path + ": " + (txt.length() > 3000 ? txt.substring(0, 3000) + "..." : txt));
+					} catch (java.io.IOException e) {
+						System.out.println("[isekai-font] " + path + ": erro " + e);
+					}
+				});
+			}
+		});
+		// mostra os de largura 1 bem grandes, entre barras, para ver quais sao vazios
+		for (int page = 0; page * 108 < Math.min(thin.size(), 324); page++) {
+			final int first = page * 108;
+			ctx.runOnClient(mc -> mc.setScreen(new net.minecraft.client.gui.screens.Screen(Component.literal("fonte")) {
+				@Override
+				public void render(net.minecraft.client.gui.GuiGraphics g, int mx, int my, float pt) {
+					g.fill(0, 0, this.width, this.height, 0xFF202020);
+					for (int i = first; i < Math.min(thin.size(), first + 108); i++) {
+						int k = i - first;
+						int x = 4 + (k % 12) * 35;
+						int y = 4 + (k / 12) * 26;
+						g.fill(x, y, x + 32, y + 24, 0xFF404040);
+						g.pose().pushPose();
+						g.pose().translate(x + 2, y + 1, 0);
+						g.pose().scale(2f, 2f, 1f);
+						g.drawString(this.font, "[" + new String(Character.toChars(thin.get(i))) + "]", 0, 0, 0xFFFFFFFF, false);
+						g.pose().popPose();
+						g.drawString(this.font, Integer.toHexString(thin.get(i)), x + 1, y + 16, 0xFFFFE070, false);
+					}
+				}
+			}));
+			ctx.waitTicks(3);
+			ctx.takeScreenshot("isekai-00-fonte-" + page);
+		}
+		ctx.runOnClient(mc -> mc.setScreen(null));
 	}
 
 	/** Quantos itens o jogador tem na bolsa e na barra, segundo o servidor. */
